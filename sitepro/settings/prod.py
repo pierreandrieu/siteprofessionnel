@@ -38,5 +38,6 @@ SECURE_HSTS_PRELOAD = True
 SECURE_REFERRER_POLICY = "same-origin"
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
+SECURE_REDIRECT_EXEMPT = [r"^healthz$"]
 
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
