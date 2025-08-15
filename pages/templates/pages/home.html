@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}accueil — site pro{% endblock %}
+{% block content %}
+    <div class="row align-items-center">
+        <div class="col-lg-7">
+            <h1 class="display-6 mb-3">bienvenue</h1>
+            <p class="lead">ce site présentera mes activités professionnelles et, bientôt, un outil de création de plans
+                de classe.</p>
+            <a class="btn btn-primary" href="{% url 'pages:about' %}">en savoir plus</a>
+        </div>
+        <div class="col-lg-5 d-none d-lg-block">
+            <div class="p-4 bg-light border rounded-3">
+                <strong>à venir :</strong> l’outil “plan de classe” (onglet dédié).
+            </div>
+        </div>
+    </div>
+{% endblock %}

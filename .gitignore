@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Django
+db.sqlite3
+media/
+staticfiles/
+
+# Env (never commit real secrets)
+.env
+.env.*
+!.env.dev.example
+!.env.prod.example
+
+# Editors/IDEs
+.venv/
+venv/
+.idea/
+
+# Misc
+*.log
+.DS_Store

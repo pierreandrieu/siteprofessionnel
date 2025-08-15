@@ -1,0 +1,43 @@
+# docker-compose.prod.yml
+services:
+  db:
+    image: postgres:16
+    env_file: .env.prod
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  web:
+    build: .
+    env_file: .env.prod
+    environment:
+      DJANGO_SETTINGS_MODULE: sitepro.settings.prod
+    depends_on:
+      - db
+    ports:
+      - "127.0.0.1:8000:8000"
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    healthcheck:
+      # use Python (present in image) instead of curl
+      test: [ "CMD-SHELL", "python - <<'PY'\nimport urllib.request,sys\ntry:\n  urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2)\n  sys.exit(0)\nexcept Exception:\n  sys.exit(1)\nPY" ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  postgres_data:
