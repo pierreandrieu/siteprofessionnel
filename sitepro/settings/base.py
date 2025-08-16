@@ -1,6 +1,12 @@
 from pathlib import Path
 import os
 
+
+def _level(env_name: str, default: str = "INFO") -> str:
+    val = os.getenv(env_name, default).upper()
+    return val if val in {"CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"} else default
+
+
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-only-change-me")
@@ -58,7 +64,7 @@ DATABASES = {
 }
 
 # Static & media
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]  # dev
 STATIC_ROOT = BASE_DIR / "staticfiles"  # prod collectstatic
 
@@ -70,3 +76,42 @@ LANGUAGE_CODE = "fr-fr"
 TIME_ZONE = "Europe/Paris"
 USE_I18N = True
 USE_TZ = True
+
+# LOGS
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "console": {
+            "format": "%(asctime)s %(levelname)s %(name)s: %(message)s",
+            "datefmt": "%Y-%m-%dT%H:%M:%S%z",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "console",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": _level("DJANGO_LOG_LEVEL", "INFO"),  # <--- vient de l'env
+    },
+    "loggers": {
+        "django.server": {
+            "handlers": ["console"],
+            "level": _level("DJANGO_SERVER_LOG_LEVEL", "INFO"),
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "django.db.backends": {
+            "handlers": ["console"],
+            "level": _level("DJANGO_DB_LOG_LEVEL", "WARNING"),
+            "propagate": False,
+        },
+    },
+}
