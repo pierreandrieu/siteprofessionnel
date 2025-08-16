@@ -33,4 +33,10 @@ EXPOSE 8000
 ENV DJANGO_SETTINGS_MODULE=sitepro.settings.dev
 
 ENTRYPOINT ["docker-entrypoint.sh"]
-CMD ["gunicorn", "sitepro.wsgi:application", "--bind=0.0.0.0:8000", "--workers=9", "--max-requests=1000", "--max-requests-jitter=100", "--timeout=30"]
+CMD ["gunicorn", "sitepro.wsgi:application",
+     "--bind=0.0.0.0:8000",
+     "--workers=${GUNICORN_WORKERS:-6}",
+     "--max-requests=1000",
+     "--max-requests-jitter=100",
+     "--timeout=30",
+     "--graceful-timeout=30"]

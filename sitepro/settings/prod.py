@@ -37,8 +37,6 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
 SECURE_REDIRECT_EXEMPT = [r"^healthz$"]
 
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
-
 LOGGING = {
        "version": 1,
        "disable_existing_loggers": False,
