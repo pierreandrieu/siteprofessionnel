@@ -21,6 +21,7 @@ services:
     build: .
     env_file: .env.prod
     environment:
+      ENVIRONMENT: production
       DJANGO_SETTINGS_MODULE: sitepro.settings.prod
     depends_on:
       - db
