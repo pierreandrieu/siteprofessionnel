@@ -18,16 +18,17 @@ Including another URLconf
 from django.contrib import admin
 from django.http import HttpResponse
 from django.urls import path, include
+from django.http import HttpResponse
 
 
-def healthz(_request):
+def healthz(_request)->HttpResponse:
     # Simple liveness check
     return HttpResponse("ok", content_type="text/plain")
 
 
 urlpatterns = [
+    path("super-portal-f0b2b3/", admin.site.urls),
     path("healthz", healthz),
     path("", include("pages.urls")),
-    path("admin/", admin.site.urls),
 ]
 
