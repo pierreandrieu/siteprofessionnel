@@ -1,3 +1,7 @@
+pip-tools
 django
 gunicorn
 psycopg[binary]
+python-dotenv
+pytest
+pytest-django
