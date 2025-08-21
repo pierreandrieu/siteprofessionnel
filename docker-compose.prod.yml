@@ -1,4 +1,12 @@
 services:
+  init-fs:
+    image: busybox:1.36
+    # Create host directories with the correct owner (app UID)
+    command: sh -c "install -d -o 10001 -g 10001 /host/static /host/media"
+    volumes:
+      - /var/www/pierreandrieu/static:/host/static
+      - /var/www/pierreandrieu/media:/host/media
+    restart: "no"
   db:
     image: postgres:16
     env_file: .env.prod
@@ -25,11 +33,13 @@ services:
       ENVIRONMENT: production
       DJANGO_SETTINGS_MODULE: sitepro.settings.prod
     depends_on:
+      init-fs:
+        condition: service_completed_successfully
       db:
         condition: service_healthy
     volumes:
-      - static:/app/staticfiles
-      - media:/app/media
+      - /var/www/pierreandrieu/static:/app/staticfiles
+      - /var/www/pierreandrieu/media:/app/media
     ports:
       - "127.0.0.1:8000:8000"
     restart: unless-stopped
@@ -39,7 +49,7 @@ services:
         max-size: "10m"
         max-file: "5"
     healthcheck:
-      test: [ "CMD-SHELL", "python - <<'PY'\nimport urllib.request,sys\ntry:\n  urllib.request.urlopen('http://localhost:8000/healthz', timeout=2)\n  sys.exit(0)\nexcept Exception:\n  sys.exit(1)\nPY" ]
+      test: [ "CMD-SHELL", "python - <<'PY'\nimport socket,sys\ns=socket.socket(); s.settimeout(2)\ntry:\n s.connect(('localhost',8000)); s.close(); sys.exit(0)\nexcept Exception:\n sys.exit(1)\nPY" ]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -51,6 +61,11 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"      # optionnel
+          memory: 2g
 
 #  nginx:
 #    image: nginx:1.27-alpine
@@ -80,6 +95,6 @@ services:
 
 volumes:
   postgres_data:
-  static:
-  media:
+#  static:
+#  media:
 #  certs:

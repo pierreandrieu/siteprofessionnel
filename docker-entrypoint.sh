@@ -11,12 +11,24 @@ if [[ "${ENVIRONMENT:-}" == "production" && "${DJANGO_SETTINGS_MODULE}" != "site
   exit 1
 fi
 
-if [[ "${RUN_MIGRATIONS:-1}" == "1" ]]; then
+RUN_MIGRATIONS="${RUN_MIGRATIONS:-1}"
+RUN_COLLECTSTATIC="${RUN_COLLECTSTATIC:-1}"
+
+if [ "$RUN_MIGRATIONS" = "1" ]; then
   python manage.py migrate --noinput
 fi
-
-if [[ "${RUN_COLLECTSTATIC:-1}" == "1" ]]; then
+if [ "$RUN_COLLECTSTATIC" = "1" ]; then
   python manage.py collectstatic --noinput
+fi
+
+# Only run the deployment checklist in production
+if [ "${ENVIRONMENT:-}" = "production" ]; then
+  # Hard-fail if prod without a real secret key
+  if [ -z "${DJANGO_SECRET_KEY:-}" ] || [ "${DJANGO_SECRET_KEY}" = "dev-only-change-me" ]; then
+    echo "Missing/unsafe DJANGO_SECRET_KEY in production. Aborting." >&2
+    exit 1
+  fi
+  python manage.py check --deploy
 fi
 
 exec "$@"

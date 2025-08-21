@@ -13,7 +13,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /app
 
 # Non-root user
-RUN useradd -m appuser
+RUN useradd -m -u 10001 appuser
 
 # App files and dependencies
 COPY --from=builder /install /usr/local
@@ -35,11 +35,12 @@ ENV DJANGO_SETTINGS_MODULE=sitepro.settings.dev
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["/bin/sh","-c","gunicorn sitepro.wsgi:application \
   --bind=0.0.0.0:8000 \
-  --workers=${GUNICORN_WORKERS:-6} \
+  --workers=${GUNICORN_WORKERS:-9} \
   --max-requests=1000 \
   --max-requests-jitter=100 \
-  --timeout=30 \
+  --timeout=60 \
   --graceful-timeout=30 \
+    --forwarded-allow-ips=127.0.0.1 \
   --access-logfile - \
   --error-logfile - \
   --log-level info"]
