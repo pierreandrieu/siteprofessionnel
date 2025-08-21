@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Ensure files are created with sane perms (e.g., 0644 / 0755).
+umask "${UMASK:-0022}"   # comments in English
+
 # Default to dev settings if nothing is specified (useful locally).
-# In production, ENVIRONMENT=production is set to enforce the check below.
 export DJANGO_SETTINGS_MODULE="${DJANGO_SETTINGS_MODULE:-sitepro.settings.dev}"
 
 # Fail fast if looks like production but not using production settings.
@@ -21,9 +23,7 @@ if [ "$RUN_COLLECTSTATIC" = "1" ]; then
   python manage.py collectstatic --noinput
 fi
 
-# Only run the deployment checklist in production
 if [ "${ENVIRONMENT:-}" = "production" ]; then
-  # Hard-fail if prod without a real secret key
   if [ -z "${DJANGO_SECRET_KEY:-}" ] || [ "${DJANGO_SECRET_KEY}" = "dev-only-change-me" ]; then
     echo "Missing/unsafe DJANGO_SECRET_KEY in production. Aborting." >&2
     exit 1
