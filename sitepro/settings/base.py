@@ -78,9 +78,13 @@ USE_TZ = True
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # LOGS
+# comments in English
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "filters": {
+        "require_debug_false": {"()": "django.utils.log.RequireDebugFalse"},
+    },
     "formatters": {
         "console": {
             "format": "%(asctime)s %(levelname)s %(name)s: %(message)s",
@@ -88,14 +92,17 @@ LOGGING = {
         },
     },
     "handlers": {
-        "console": {
-            "class": "logging.StreamHandler",
-            "formatter": "console",
+        "console": {"class": "logging.StreamHandler", "formatter": "console"},
+        "mail_admins": {
+            "class": "django.utils.log.AdminEmailHandler",
+            "level": "ERROR",
+            "filters": ["require_debug_false"],
+            "include_html": True,
         },
     },
     "root": {
         "handlers": ["console"],
-        "level": _level("DJANGO_LOG_LEVEL", "INFO"),  # <--- vient de l'env
+        "level": _level("DJANGO_LOG_LEVEL", "INFO"),
     },
     "loggers": {
         "django.server": {
@@ -103,9 +110,15 @@ LOGGING = {
             "level": _level("DJANGO_SERVER_LOG_LEVEL", "INFO"),
             "propagate": False,
         },
+        # Only errors go to mail_admins to avoid noise
         "django.request": {
-            "handlers": ["console"],
-            "level": "INFO",
+            "handlers": ["console", "mail_admins"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+        "django.security": {
+            "handlers": ["console", "mail_admins"],
+            "level": "ERROR",
             "propagate": False,
         },
         "django.db.backends": {
