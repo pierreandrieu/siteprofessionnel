@@ -1,0 +1,45 @@
+{# Index des documents (année → niveau → thème → fichiers) #}
+{% extends "base.html" %}
+{% block title %}documents{% endblock %}
+
+{% block content %}
+    <div class="container py-5">
+        <h1 class="h2 mb-4">documents</h1>
+
+        {% if archives %}
+            {% for year, levels in archives.items %}
+                <section class="mb-4">
+                    <h2 class="h4 mb-3">{{ year }}</h2>
+                    {% for level, themes in levels.items %}
+                        <h3 class="h5 mt-3">{{ level }}</h3>
+                        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
+                            {% for theme, files in themes.items %}
+                                <div class="col">
+                                    <div class="card h-100 shadow-sm">
+                                        <div class="card-body">
+                                            <h4 class="h6 mb-2">{{ theme|cut:"_"|cut:"-" }}</h4>
+                                            <ul class="list-unstyled mb-0">
+                                                {% for f in files %}
+                                                    <li class="mb-1">
+                                                        <a href="{% url 'pages:document_detail' year=year level=level theme=theme slug=f.slug %}">
+                                                            {{ f.name }}
+                                                        </a>
+                                                        {% if f.size %}
+                                                            <small class="text-muted">({{ f.size|filesizeformat }})</small>{% endif %}
+                                                    </li>
+                                                {% endfor %}
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endfor %}
+                </section>
+                <hr>
+            {% endfor %}
+        {% else %}
+            <p>pas encore de documents publiés.</p>
+        {% endif %}
+    </div>
+{% endblock %}

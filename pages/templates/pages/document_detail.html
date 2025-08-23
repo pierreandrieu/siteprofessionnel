@@ -1,0 +1,67 @@
+{# Détail : PDF intégré (zone scrollable) + markdown en dessous #}
+{% extends "base.html" %}
+{% block title %}{{ title }} — documents{% endblock %}
+
+{% block content %}
+    <div class="container py-5">
+        <header class="mb-4">
+            <h1 class="h3 mb-1">{{ title }}</h1>
+            <p class="text-muted mb-0">{{ level }} • {{ year }} • {{ theme }}</p>
+        </header>
+
+        <section class="mb-4">
+            <div class="pdf-viewer border rounded-3">
+                <iframe
+                        src="{{ pdf_url }}#view=FitH&embedded=true"
+                        title="pdf"
+                        loading="lazy"
+                        referrerpolicy="no-referrer"
+                        class="pdf-frame">
+                </iframe>
+            </div>
+            <div class="mt-2">
+                <a class="btn btn-sm btn-outline-secondary" href="{{ pdf_url }}" target="_blank" rel="noopener">
+                    ouvrir dans un nouvel onglet
+                </a>
+                <small class="text-muted ms-2">si le pdf ne s’affiche pas, utilisez ce lien.</small>
+            </div>
+        </section>
+
+        <section>
+            <h2 class="h5">compléments</h2>
+            {% if md_html %}
+                <article class="markdown-body">{{ md_html|safe }}</article>
+            {% else %}
+                <p class="text-muted">pas encore de contenu complémentaire.</p>
+            {% endif %}
+        </section>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+    <script>
+        /*
+        Petit script optionnel pour des "exercices" rudimentaires directement dans le markdown.
+        Convention :
+        <div data-ex>
+          <input data-answer="attendu">
+          <button data-check>vérifier</button>
+          <span data-feedback></span>
+        </div>
+        */
+        document.addEventListener('click', function (e) {
+            const btn = e.target.closest('[data-check]');
+            if (!btn) return;
+            const wrap = btn.closest('[data-ex]');
+            if (!wrap) return;
+            const input = wrap.querySelector('input[data-answer]');
+            const out = wrap.querySelector('[data-feedback]');
+            if (!input || !out) return;
+            const expected = (input.dataset.answer || '').trim().toLowerCase();
+            const got = (input.value || '').trim().toLowerCase();
+            const ok = expected && got === expected;
+            out.textContent = ok ? '✔️ correct' : '✖️ essaye encore';
+            out.className = ok ? 'text-success' : 'text-danger';
+        });
+    </script>
+{% endblock %}
