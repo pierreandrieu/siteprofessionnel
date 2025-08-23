@@ -29,3 +29,4 @@ else:
 # From identities in dev (safe defaults)
 SERVER_EMAIL = os.getenv("SERVER_EMAIL", "django@pierreandrieu.fr")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply-dev@pierreandrieu.fr")
+X_FRAME_OPTIONS = "SAMEORIGIN"

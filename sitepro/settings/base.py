@@ -84,6 +84,7 @@ LOGGING = {
     "disable_existing_loggers": False,
     "filters": {
         "require_debug_false": {"()": "django.utils.log.RequireDebugFalse"},
+        "skip_disallowedhost": {"()": "sitepro.logging_filters.IgnoreDisallowedHost"},
     },
     "formatters": {
         "console": {
