@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% load cours_extras %}
+
+{% block title %}cours — {{ year }} — {{ level_dir|prettify }}{% endblock %}
+
+{% block content %}
+    <div class="container py-4">
+        <h1 class="h3 mb-4">
+            cours — <span class="text-muted">{{ year }}</span> — {{ level_dir|prettify }}
+        </h1>
+
+        {% if not theme_map %}
+            <div class="alert alert-info">Aucun document pour ce niveau pour cette année.</div>
+        {% else %}
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+                {% for theme, docs in theme_map.items %}
+                    <div class="col">
+                        <div class="card h-100 shadow-sm">
+                            <div class="card-body">
+                                <h2 class="h6 mb-3">{{ theme|prettify|capfirst }}</h2>
+                                <ul class="list-unstyled mb-0">
+                                    {% for d in docs %}
+                                        <li class="mb-2">
+                                            <a href="{{ d.url }}">{{ d.title }}</a>
+                                            <small class="text-muted">({{ d.size_bytes|filesizeformat }})</small>
+                                        </li>
+                                    {% empty %}
+                                        <li class="text-muted small">— aucun PDF —</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}

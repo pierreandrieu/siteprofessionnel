@@ -99,6 +99,46 @@ class MdAssetEntry:
 # -----------------------------
 # Parcours des sources (SRC)
 # -----------------------------
+def has_themes(level_dir: Path) -> bool:
+    """Heuristique : ce dossier de niveau contient-il des thèmes avec des PDF ?"""
+    if not level_dir.is_dir():
+        return False
+    for th in level_dir.iterdir():
+        if not th.is_dir():
+            continue
+        out_dir = th / "out"
+        if out_dir.is_dir() and any(out_dir.glob("*.pdf")):
+            return True
+        if any(th.glob("*.pdf")):
+            return True
+    return False
+
+
+def _dir_has_themes(level_dir: Path) -> bool:
+    try:
+        for th in level_dir.iterdir():
+            if not th.is_dir():
+                continue
+            out_dir = th / "out"
+            if out_dir.is_dir() and any(out_dir.glob("*.pdf")):
+                return True
+            if any(th.glob("*.pdf")):
+                return True
+    except OSError:
+        return False
+    return False
+
+
+def _iter_level_dirs(year_dir: Path) -> Iterator[Path]:
+    # Rend des dossiers "niveau" quel que soit le layout
+    for first in sorted((p for p in year_dir.iterdir() if p.is_dir())):
+        if _dir_has_themes(first):
+            yield first  # ancien layout: <year>/<level>/...
+        else:
+            for lvl in sorted((p for p in first.iterdir() if p.is_dir())):
+                if _dir_has_themes(lvl):
+                    yield lvl  # nouveau layout: <year>/<institution>/<level>/...
+
 
 def iter_pdfs(src_root: Path, dst_root: Path) -> Iterator[PdfEntry]:
     """
@@ -111,37 +151,37 @@ def iter_pdfs(src_root: Path, dst_root: Path) -> Iterator[PdfEntry]:
     """
     # On parcourt <SRC>/<année>/<niveau>/<thème>/out/*.pdf
     for year_dir in sorted((p for p in src_root.iterdir() if p.is_dir())):
-        year: str = year_dir.name
+        year = year_dir.name
         if not YEAR_RE.match(year):
             continue
 
-        for level_dir in sorted((p for p in year_dir.iterdir() if p.is_dir())):
-            level: str = level_dir.name
-            if not LEVEL_RE.match(level):
+        for institution_dir in sorted((p for p in year_dir.iterdir() if p.is_dir())):
+            # Si on tombe sur l'ancien layout (<year>/<level>/...), on l'ignore
+            if LEVEL_RE.match(institution_dir.name) and has_themes(institution_dir):
+                print(f"[warn] legacy sans établissement ignoré: {institution_dir}")
                 continue
 
-            for theme_dir in sorted((p for p in level_dir.iterdir() if p.is_dir())):
-                theme: str = theme_dir.name
-                if not THEME_RE.match(theme):
+            # Layout attendu: <year>/<institution>/<level>/...
+            for level_dir in sorted((p for p in institution_dir.iterdir() if p.is_dir() and LEVEL_RE.match(p.name))):
+                if not has_themes(level_dir):
                     continue
 
-                out_dir: Path = theme_dir / "out"
-                if not out_dir.is_dir():
-                    continue
-
-                for pdf in sorted(out_dir.glob("*.pdf")):
-                    if not pdf.is_file():
+                for theme_dir in sorted((p for p in level_dir.iterdir() if p.is_dir())):
+                    out_dir = theme_dir / "out"
+                    if not out_dir.is_dir():
                         continue
-                    # Destination = <DST>/<year>/<level>/<theme>/out/<file.pdf>
-                    rel_dst: Path = Path(year) / level / theme / "out" / pdf.name
-                    yield PdfEntry(
-                        year=year,
-                        level=level,
-                        theme=theme,
-                        src=pdf.resolve(),
-                        dst=(dst_root / rel_dst).resolve(),
-                    )
 
+                    for pdf in sorted(out_dir.glob("*.pdf")):
+                        if not pdf.is_file():
+                            continue
+                        rel_dst = Path(year) / institution_dir.name / level_dir.name / theme_dir.name / "out" / pdf.name
+                        yield PdfEntry(
+                            year=year,
+                            level=level_dir.name,
+                            theme=theme_dir.name,
+                            src=pdf.resolve(),
+                            dst=(dst_root / rel_dst).resolve(),
+                        )
 
 def iter_md_assets_for_theme(
         year: str,
@@ -289,7 +329,12 @@ def prune_obsolete(dst_root: Path, valid_targets: Iterable[Path], dry_run: bool)
     :param valid_targets: Itérable des chemins de destination attendus (c.-à-d. les chemins de liens).
     :param dry_run: Si True, ne modifie rien.
     """
-    valid_set: Set[Path] = {p.resolve() for p in valid_targets}
+    """
+    Supprime tout lien symbolique dont le CHEMIN DE LIEN n'est pas dans valid_targets
+    (et les liens cassés).
+    """
+    # On veut comparer des chemins de LIENS absolus, sans résolution de la cible.
+    valid_set: Set[Path] = {p.absolute() for p in valid_targets}
     if not dst_root.is_dir():
         return
 
@@ -297,18 +342,16 @@ def prune_obsolete(dst_root: Path, valid_targets: Iterable[Path], dry_run: bool)
         if not link.is_symlink():
             continue
 
-        # lien cassé (cible absente) → suppression
-        try:
-            _ = link.resolve().exists()
-        except FileNotFoundError:
+        # 1) lien cassé → suppression
+        if not link.exists():  # existe == False pour symlink cassé
             if dry_run:
                 print(f"[dry-run] rm broken {link}")
             else:
                 link.unlink(missing_ok=True)
             continue
 
-        # si ce chemin de lien n'est pas attendu → suppression
-        if link.resolve() and link.resolve() not in valid_set:
+        # 2) lien non attendu (par son chemin) → suppression
+        if link.absolute() not in valid_set:
             if dry_run:
                 print(f"[dry-run] rm obsolete {link}")
             else:
