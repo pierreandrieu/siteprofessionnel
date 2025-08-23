@@ -6,6 +6,7 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.http import HttpResponse
 from django.urls import include, path
+from django.views.generic import TemplateView
 
 
 def healthz(_request) -> HttpResponse:
@@ -25,6 +26,12 @@ urlpatterns = [
 
     # app cours (index, par niveau, détail)
     path("cours/", include(("cours.urls", "cours"), namespace="cours")),
+
+    path(
+        "robots.txt",
+        TemplateView.as_view(template_name="robots.txt", content_type="text/plain"),
+        name="robots_txt",
+    ),
 ]
 
 # en dev seulement : servir les fichiers media via django

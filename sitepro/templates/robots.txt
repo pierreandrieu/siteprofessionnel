@@ -1,0 +1,13 @@
+User-agent: *
+Disallow: /admin/
+Disallow: /accounts/
+Disallow: /plandeclasse/api/
+Disallow: /plandeclasse/export/
+Disallow: /plandeclasse/tasks/
+
+Disallow: /*.pdf$
+
+Allow: /cours/
+Allow: /cours/*
+
+Crawl-delay: 60
