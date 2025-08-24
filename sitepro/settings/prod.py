@@ -7,6 +7,9 @@ STATICFILES_STORAGE = "django.contrib.staticfiles.storage.ManifestStaticFilesSto
 
 ALLOWED_HOSTS = [h.strip() for h in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost").split(",") if h.strip()]
 
+MEDIA_ROOT = os.environ.get("MEDIA_ROOT", BASE_DIR / "media")
+MEDIA_URL = "/media/"
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",

@@ -34,14 +34,16 @@ services:
     environment:
       ENVIRONMENT: production
       DJANGO_SETTINGS_MODULE: sitepro.settings.prod
+      MEDIA_ROOT: /app/media
+
     depends_on:
       init-fs:
         condition: service_completed_successfully
       db:
         condition: service_healthy
     volumes:
-      - /var/www/pierreandrieu/static:/app/staticfiles
-      - /var/www/pierreandrieu/media:/app/media
+      - /var/www/pierreandrieu/static:/app/staticfiles:ro
+      - /var/www/pierreandrieu/media:/app/media:ro
     ports:
       - "127.0.0.1:8000:8000"
     restart: unless-stopped

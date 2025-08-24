@@ -39,6 +39,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import shutil
 import sys
 import time
 from dataclasses import dataclass
@@ -114,7 +115,7 @@ def has_themes(level_dir: Path) -> bool:
     return False
 
 
-def _dir_has_themes(level_dir: Path) -> bool:
+def dir_has_themes(level_dir: Path) -> bool:
     try:
         for th in level_dir.iterdir():
             if not th.is_dir():
@@ -132,11 +133,11 @@ def _dir_has_themes(level_dir: Path) -> bool:
 def _iter_level_dirs(year_dir: Path) -> Iterator[Path]:
     # Rend des dossiers "niveau" quel que soit le layout
     for first in sorted((p for p in year_dir.iterdir() if p.is_dir())):
-        if _dir_has_themes(first):
+        if dir_has_themes(first):
             yield first  # ancien layout: <year>/<level>/...
         else:
             for lvl in sorted((p for p in first.iterdir() if p.is_dir())):
-                if _dir_has_themes(lvl):
+                if dir_has_themes(lvl):
                     yield lvl  # nouveau layout: <year>/<institution>/<level>/...
 
 
@@ -334,28 +335,21 @@ def prune_obsolete(dst_root: Path, valid_targets: Iterable[Path], dry_run: bool)
     (et les liens cassés).
     """
     # On veut comparer des chemins de LIENS absolus, sans résolution de la cible.
-    valid_set: Set[Path] = {p.absolute() for p in valid_targets}
+    valid_rel = {p.relative_to(dst_root) for p in valid_targets}
     if not dst_root.is_dir():
         return
-
-    for link in dst_root.rglob("*"):
-        if not link.is_symlink():
+    for path in dst_root.rglob("*"):
+        if path.is_dir() or path.name == ".v":
             continue
-
-        # 1) lien cassé → suppression
-        if not link.exists():  # existe == False pour symlink cassé
-            if dry_run:
-                print(f"[dry-run] rm broken {link}")
-            else:
-                link.unlink(missing_ok=True)
+        try:
+            rel = path.relative_to(dst_root)
+        except ValueError:
             continue
-
-        # 2) lien non attendu (par son chemin) → suppression
-        if link.absolute() not in valid_set:
+        if rel not in valid_rel:
             if dry_run:
-                print(f"[dry-run] rm obsolete {link}")
+                print(f"[dry-run] rm obsolete {path}")
             else:
-                link.unlink(missing_ok=True)
+                path.unlink(missing_ok=True)
 
 
 # -----------------------------
@@ -372,6 +366,30 @@ def parse_exts(exts_csv: str) -> Set[str]:
     for e in items:
         normed.add(e if e.startswith(".") else f".{e}")
     return normed
+
+
+def install_file(src: Path, dst: Path, mode: str, relative: bool, dry_run: bool) -> None:
+    # supprime l’existant
+    if dst.exists() or dst.is_symlink():
+        if dry_run:
+            print(f"[dry-run] rm {dst}")
+        else:
+            dst.unlink(missing_ok=True)
+
+    if mode == "symlink":
+        make_symlink(src=src, dst=dst, relative=relative, dry_run=dry_run)
+    elif mode == "hardlink":
+        ensure_parent_dir(dst, dry_run=dry_run)
+        if dry_run:
+            print(f"[dry-run] ln {src} -> {dst}")
+        else:
+            os.link(src, dst)
+    else:  # copy
+        ensure_parent_dir(dst, dry_run=dry_run)
+        if dry_run:
+            print(f"[dry-run] cp -p {src} {dst}")
+        else:
+            shutil.copy2(src, dst)
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -401,6 +419,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                         help="Supprimer les liens obsolètes côté destination")
     parser.add_argument("--assets-ext", type=str, default="png,jpg,jpeg,gif,svg,webp",
                         help="Extensions d'assets à publier depuis exos_web_md (CSV). Ex: png,jpg,svg,webp")
+    parser.add_argument("--mode", choices=("symlink", "copy", "hardlink"), default="symlink",
+                        help="Méthode de publication: symlink (dev), copy (prod), hardlink (si même FS)."
+    )
 
     args = parser.parse_args(argv)
 
@@ -447,15 +468,16 @@ def main(argv: Optional[List[str]] = None) -> int:
         )
 
     # 3) Créer les symlinks
-    #    3a) PDF
+
+    # 3a) PDF
     for e in entries_pdf:
         ensure_parent_dir(e.dst, dry_run=args.dry_run)
-        make_symlink(src=e.src, dst=e.dst, relative=args.relative, dry_run=args.dry_run)
+        install_file(src=e.src, dst=e.dst, mode=args.mode, relative=args.relative, dry_run=args.dry_run)
 
-    #    3b) Compléments MD & assets
+    # 3b) compléments
     for m in entries_md:
         ensure_parent_dir(m.dst, dry_run=args.dry_run)
-        make_symlink(src=m.src, dst=m.dst, relative=args.relative, dry_run=args.dry_run)
+        install_file(src=m.src, dst=m.dst, mode=args.mode, relative=args.relative, dry_run=args.dry_run)
 
     # 4) Optionnel : purge des liens obsolètes (PDF + compléments)
     if args.prune:

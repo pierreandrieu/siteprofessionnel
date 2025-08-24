@@ -7,6 +7,8 @@ import re
 
 from django.conf import settings
 
+from scripts.dev_publish_symlinks import dir_has_themes
+
 
 class DocumentItem(TypedDict):
     name: str
@@ -37,21 +39,6 @@ def version_token() -> str:
         return "0"
 
 
-def _dir_has_themes(level_dir: Path) -> bool:
-    try:
-        for th in level_dir.iterdir():
-            if not th.is_dir():
-                continue
-            out_dir = th / "out"
-            if out_dir.is_dir() and any(out_dir.glob("*.pdf")):
-                return True
-            if any(th.glob("*.pdf")):
-                return True
-    except OSError:
-        return False
-    return False
-
-
 @lru_cache(maxsize=8)
 def scan(version: str) -> ArchiveTree:
     """
@@ -70,12 +57,12 @@ def scan(version: str) -> ArchiveTree:
 
         for first in sorted((p for p in year_dir.iterdir() if p.is_dir()), key=lambda p: p.name):
             level_dirs: List[Path] = []
-            if _dir_has_themes(first):
+            if dir_has_themes(first):
                 level_dirs.append(first)  # ancien layout
             else:
                 try:
                     for lvl in sorted((p for p in first.iterdir() if p.is_dir()), key=lambda p: p.name):
-                        if _dir_has_themes(lvl):
+                        if dir_has_themes(lvl):
                             level_dirs.append(lvl)  # nouveau layout
                 except OSError:
                     pass
@@ -119,3 +106,4 @@ def prewarm() -> None:
         scan(version_token())
     except Exception:
         pass
+

@@ -4,12 +4,14 @@ from collections import defaultdict
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, Final, Iterable, List, Tuple, Iterator, Optional
+from typing import Dict, Final, Iterable, List, Tuple, Optional
 
 from django.conf import settings
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import render
 from urllib.parse import quote
+
+from scripts.dev_publish_symlinks import dir_has_themes
 
 
 @dataclass(frozen=True)
@@ -69,22 +71,6 @@ def _human_title(slug: str) -> str:
     return title
 
 
-def _dir_has_themes(level_dir: Path) -> bool:
-    """Heuristique : ce dossier contient-il des thèmes avec des PDF ?"""
-    try:
-        for th in level_dir.iterdir():
-            if not th.is_dir():
-                continue
-            out_dir = th / "out"
-            if out_dir.is_dir() and any(out_dir.glob("*.pdf")):
-                return True
-            if any(th.glob("*.pdf")):
-                return True
-    except OSError:
-        return False
-    return False
-
-
 def _iter_level_dirs(year_dir: Path) -> Iterable[Tuple[str, Path]]:
     """
     Rend (institution, level_dir) pour gérer 2 layouts source :
@@ -94,8 +80,8 @@ def _iter_level_dirs(year_dir: Path) -> Iterable[Tuple[str, Path]]:
     """
     for inst in sorted((p for p in year_dir.iterdir() if p.is_dir()), key=lambda p: p.name):
         for lvl in sorted((p for p in inst.iterdir() if p.is_dir()), key=lambda p: p.name):
-            if _dir_has_themes(lvl):
-                yield (inst.name, lvl)
+            if dir_has_themes(lvl):
+                yield inst.name, lvl
 
 
 def _collect_docs_under_level(year: str, institution: str, level_dir: Path) -> List[DocItem]:
@@ -145,12 +131,17 @@ def build_index() -> List[DocItem]:
             items.extend(_collect_docs_under_level(year, institution, level_dir))
     return items
 
+
 def index(request: HttpRequest) -> HttpResponse:
     """
     /cours/ : Années (desc) → Établissements → Niveaux (cliquables)
     """
     base = _media_root() / "documents"
-    items = build_index()
+    # items = build_index()
+
+    if not base.exists():  # ← garde-fou prod
+        ctx = {"by_year_institutions": [], "debug": settings.DEBUG}
+        return render(request, "cours/index.html", ctx)
 
     # Construire (année → établissement → {niveaux})
     by_year_institutions: List[Tuple[str, List[Tuple[str, List[str]]]]] = []
@@ -200,6 +191,7 @@ def year_level(request: HttpRequest, year: str, level: str) -> HttpResponse:
         "debug": settings.DEBUG,
     }
     return render(request, "cours/year_level.html", ctx)
+
 
 def detail(request: HttpRequest, year: str, level: str, theme: str, slug: str) -> HttpResponse:
     """
