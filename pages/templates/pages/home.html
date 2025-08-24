@@ -1,16 +1,82 @@
 {% extends "base.html" %}
-{% block title %}accueil — site pro{% endblock %}
+{% block title %}Pierre Andrieu — NSI & outils{% endblock %}
+
 {% block content %}
-    <div class="row align-items-center">
-        <div class="col-lg-7">
-            <h1 class="display-6 mb-3">bienvenue</h1>
-            <p class="lead">ce site présentera mes activités professionnelles et, bientôt, un outil de création de plans
-                de classe.</p>
-            <a class="btn btn-primary" href="{% url 'pages:about' %}">en savoir plus</a>
+    <div class="py-5">
+        <!-- Hero sans parenthèses, deux usages mis en valeur -->
+        <div class="row align-items-center g-4">
+            <div class="col-lg-7">
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle mb-3">NSI & outils pédagogiques</span>
+                <h1 class="display-6 mb-3">Bienvenue&nbsp;!</h1>
+
+                <p class="lead mb-4">Ce site s’adresse aux élèves et aux collègues, avec des contenus adaptés&nbsp;:</p>
+
+                <div class="d-flex flex-column gap-2 mb-4">
+                    <div class="p-3 bg-body-tertiary border rounded-3">
+                        <strong>Pour les élèves</strong> — cours de NSI, exercices et ressources (Première, Terminale,
+                        SNT).
+                    </div>
+                    <div class="p-3 bg-body-tertiary border rounded-3">
+                        <strong>Pour les collègues</strong> — un outil de génération de <span
+                            class="text-nowrap">plan de classe</span> paramétrable avec des contraintes.
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2">
+                    <a class="btn btn-primary btn-lg" href="{% url 'cours:index' %}">Accéder aux cours</a>
+                    <a class="btn btn-outline-primary btn-lg" href="/plandeclasse/">Plan de classe</a>
+                </div>
+
+                <p class="text-muted small mt-3">Les supports sont mis à jour régulièrement et consultables en ligne au
+                    format PDF.</p>
+            </div>
+
         </div>
-        <div class="col-lg-5 d-none d-lg-block">
-            <div class="p-4 bg-light border rounded-3">
-                <strong>à venir :</strong> l’outil “plan de classe” (onglet dédié).
+
+        <hr class="my-5">
+
+        <!-- Accès rapides -->
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-body">
+                        <h3 class="h5">NSI Première</h3>
+                        <p class="text-muted mb-3">Programmation, représentation des données, systèmes,
+                            algorithmique…</p>
+                        <a class="btn btn-outline-secondary" href="{% url 'cours:index' %}">Voir les ressources</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-body">
+                        <h3 class="h5">NSI Terminale</h3>
+                        <p class="text-muted mb-3">Structures de données, graphes, BD/SQL, réseaux, récursivité…</p>
+                        <a class="btn btn-outline-secondary" href="{% url 'cours:index' %}">Voir les ressources</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-body">
+                        <h3 class="h5">SNT</h3>
+                        <p class="text-muted mb-3">Web, données, Internet, images numériques&nbsp;: documents et
+                            activités.</p>
+                        <a class="btn btn-outline-secondary" href="{% url 'cours:index' %}">Voir les ressources</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bandeau collègues -->
+        <div class="mt-5 p-4 p-md-5 rounded-4 border bg-body-tertiary">
+            <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3">
+                <div>
+                    <h2 class="h4 mb-1">Outil «&nbsp;Plan de classe&nbsp;»</h2>
+                    <p class="mb-0 text-muted">Préparez vos salles rapidement, exportez et ajustez séance par
+                        séance.</p>
+                </div>
+                <a class="btn btn-primary btn-lg" href="/plandeclasse/">Ouvrir l’outil</a>
             </div>
         </div>
     </div>
