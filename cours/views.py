@@ -5,15 +5,14 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 from typing import Dict, Final, Iterable, List, Tuple, Optional
-from datetime import date
 
-from django.utils import timezone
 from django.conf import settings
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import render
 from urllib.parse import quote
 
 from scripts.dev_publish_symlinks import dir_has_themes
+from sitepro.utils import current_school_year
 from .docindex import version_token
 
 
@@ -55,25 +54,6 @@ LEVEL_SLUG_TO_DIR: Final[Dict[str, str]] = {
 
 # mapping inverse utile pour fabriquer des liens
 LEVEL_DIR_TO_SLUG: Final[Dict[str, str]] = {v: k for k, v in LEVEL_SLUG_TO_DIR.items()}
-
-
-def current_school_year(today: date | None = None) -> str:
-    """
-    Retourne l'année scolaire courante au format 'YYYY-YYYY'.
-
-    Règle :
-      - du 1er août au 31 décembre : "année_courante-(année_courante+1)"
-      - du 1er janvier au 31 juillet      : "(année_courante-1)-année_courante"
-    """
-    d = today or timezone.localdate()
-    # (si tu préfères éviter timezone : d = date.today())
-    if d.month >= 8:
-        start = d.year
-        end = d.year + 1
-    else:
-        start = d.year - 1
-        end = d.year
-    return f"{start}-{end}"
 
 
 def _media_root() -> Path:
