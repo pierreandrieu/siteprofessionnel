@@ -1,25 +1,42 @@
-version: "3.9"
+# Fichier docker-compose.yml
+# Remarque: le champ "version" est obsolète avec Compose v2, on le supprime.
 
 services:
+  # 1) Service utilitaire "init-fs" :
+  #    - Crée les dossiers host s'ils n'existent pas
+  #    - Applique owner/permissions sur /var/www/... côté hôte
+  #    - S'exécute une fois avant "web"
   init-fs:
     image: busybox:1.36
     environment:
-      - UID=${UID:-1000}
-      - GID=${GID:-1000}
+      # Ces deux variables sont lues depuis .env (ou --env-file)
+      UID: "${UID:-1000}"   # UID de l’utilisateur hôte qui publie les PDFs
+      GID: "${GID:-1000}"   # GID correspondant
     command: >
-      sh -eu -c '
-        mkdir -p /host/static /host/media &&
-        chown -R "$UID:$GID" /host/static /host/media &&
-        chmod -R u+rwX,go+rX /host/static /host/media
+      sh -euxc '
+        echo "[init-fs] target owner=${UID}:${GID}";
+        install -d -o ${UID} -g ${GID} /host/static /host/media;
+        chown -R ${UID}:${GID} /host/static /host/media;
+        chmod -R u+rwX,go+rX /host/static /host/media;
+        echo "[init-fs] done";
+        ls -ldn /host/static /host/media || true
       '
     volumes:
-      - /var/www/pierreandrieu/static:/host/static:rw
-      - /var/www/pierreandrieu/media:/host/media:rw
+      # Montages en lecture/écriture côté "init-fs" (il doit pouvoir chown/chmod)
+      - type: bind
+        source: /var/www/pierreandrieu/static
+        target: /host/static
+        read_only: false
+      - type: bind
+        source: /var/www/pierreandrieu/media
+        target: /host/media
+        read_only: false
     restart: "no"
 
+  # 2) Base de données
   db:
     image: postgres:16
-    env_file: .env.prod
+    env_file: .env.prod                  # variables d'env pour le conteneur "db"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -33,9 +50,10 @@ services:
       options: { max-size: "10m", max-file: "5" }
     security_opt: [ "no-new-privileges:true" ]
 
+  # 3) Application Django
   web:
     build: .
-    env_file: .env.prod
+    env_file: .env.prod                  # variables d'env pour le conteneur "web"
     environment:
       ENVIRONMENT: production
       DJANGO_SETTINGS_MODULE: sitepro.settings.prod
@@ -46,24 +64,30 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - /var/www/pierreandrieu/static:/app/staticfiles:ro
-      - /var/www/pierreandrieu/media:/app/media:ro
+      # En PROD: montages **en lecture seule** côté "web"
+      - type: bind
+        source: /var/www/pierreandrieu/static
+        target: /app/staticfiles
+        read_only: true
+      - type: bind
+        source: /var/www/pierreandrieu/media
+        target: /app/media
+        read_only: true
     ports:
       - "127.0.0.1:8000:8000"
     restart: unless-stopped
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "5" }
-
     healthcheck:
-      test: [ "CMD", "python", "-c", "import socket,sys; s=socket.socket(); s.settimeout(2); s.connect(('127.0.0.1',8000)); s.close()" ]
+      # Test simple: ouverture d’un socket TCP sur 127.0.0.1:8000 depuis le conteneur
+      test: [ "CMD-SHELL", "python -c \"import socket,sys; s=socket.socket(); s.settimeout(2); s.connect(('127.0.0.1',8000)); s.close()\"" ]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 20s
-
-    read_only: true
-    tmpfs: [ "/tmp" ]
+    read_only: true                      # Système de fichiers du conteneur en RO
+    tmpfs: [ "/tmp" ]                    # Espace temporaire écrivable
     security_opt: [ "no-new-privileges:true" ]
     cap_drop: [ "ALL" ]
     deploy:
