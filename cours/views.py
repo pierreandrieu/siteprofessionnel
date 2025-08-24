@@ -12,6 +12,7 @@ from django.shortcuts import render
 from urllib.parse import quote
 
 from scripts.dev_publish_symlinks import dir_has_themes
+from .docindex import version_token
 
 
 @dataclass(frozen=True)
@@ -71,6 +72,10 @@ def _human_title(slug: str) -> str:
     return title
 
 
+def _hidden(p: Path) -> bool:
+    return p.name.startswith(".")
+
+
 def _iter_level_dirs(year_dir: Path) -> Iterable[Tuple[str, Path]]:
     """
     Rend (institution, level_dir) pour gérer 2 layouts source :
@@ -78,19 +83,19 @@ def _iter_level_dirs(year_dir: Path) -> Iterable[Tuple[str, Path]]:
       - nouveau : <year>/<institution>/<level>/<theme>/...
     'institution' vaut "" dans l'ancien layout.
     """
-    for inst in sorted((p for p in year_dir.iterdir() if p.is_dir()), key=lambda p: p.name):
-        for lvl in sorted((p for p in inst.iterdir() if p.is_dir()), key=lambda p: p.name):
+    for inst in sorted((p for p in year_dir.iterdir() if p.is_dir() and not _hidden(p)), key=lambda p: p.name):
+        for lvl in sorted((p for p in inst.iterdir() if p.is_dir() and not _hidden(p)), key=lambda p: p.name):
             if dir_has_themes(lvl):
                 yield inst.name, lvl
 
 
 def _collect_docs_under_level(year: str, institution: str, level_dir: Path) -> List[DocItem]:
     items: List[DocItem] = []
-    for theme_dir in sorted((p for p in level_dir.iterdir() if p.is_dir()), key=lambda p: p.name):
+    for theme_dir in sorted((p for p in level_dir.iterdir() if p.is_dir() and not _hidden(p)), key=lambda p: p.name):
         pdf_dir = theme_dir / "out"
         candidates = sorted(pdf_dir.glob("*.pdf")) if pdf_dir.is_dir() else sorted(theme_dir.glob("*.pdf"))
         for pdf in candidates:
-            if not pdf.is_file():
+            if _hidden(pdf) or not pdf.is_file():
                 continue
             size = pdf.stat().st_size
             slug = pdf.stem
@@ -114,7 +119,7 @@ def _collect_docs_under_level(year: str, institution: str, level_dir: Path) -> L
 
 
 @lru_cache(maxsize=1)
-def build_index() -> List[DocItem]:
+def build_index(version: str) -> List[DocItem]:
     """
     Indexe tous les PDF sous MEDIA_ROOT/documents, en gérant :
       - <year>/<level>/...
@@ -125,7 +130,7 @@ def build_index() -> List[DocItem]:
     items: List[DocItem] = []
     if not base.exists():
         return items
-    for year_dir in sorted((p for p in base.iterdir() if p.is_dir()), key=lambda p: p.name):
+    for year_dir in sorted((p for p in base.iterdir() if p.is_dir() and not _hidden(p)), key=lambda p: p.name):
         year = year_dir.name
         for institution, level_dir in _iter_level_dirs(year_dir):
             items.extend(_collect_docs_under_level(year, institution, level_dir))
@@ -147,7 +152,7 @@ def index(request: HttpRequest) -> HttpResponse:
     by_year_institutions: List[Tuple[str, List[Tuple[str, List[str]]]]] = []
     # structure: [(year, [(institution, [level, ...]), ...]), ...]
 
-    for year_dir in sorted((p for p in base.iterdir() if p.is_dir()), key=lambda p: p.name, reverse=True):
+    for year_dir in sorted((p for p in base.iterdir() if p.is_dir() and not _hidden(p)), key=lambda p: p.name):
         year = year_dir.name
         inst_to_levels: Dict[str, set] = defaultdict(set)
         for institution, level_dir in _iter_level_dirs(year_dir):
@@ -170,9 +175,8 @@ def year_level(request: HttpRequest, year: str, level: str) -> HttpResponse:
     /cours/<année>/<niveau>/ : Thèmes -> PDFs (tous établissements confondus)
     """
     # Filtrer l'index
-    docs = [it for it in build_index() if it.year == year and it.level == level]
-
-    # 404 si rien
+    ver = version_token()
+    docs = [it for it in build_index(ver) if it.year == year and it.level == level]
     if not docs:
         raise Http404("Aucun document pour cette année/niveau.")
 
@@ -199,13 +203,15 @@ def detail(request: HttpRequest, year: str, level: str, theme: str, slug: str) -
     On cherche sur l’ensemble des établissements (URL inchangée).
     """
 
+    ver = version_token()
     match: Optional[DocItem] = next(
-        (it for it in build_index() if
-         it.year == year and it.level == level and it.theme == theme and it.slug == slug),
+        (it for it in build_index(ver)
+         if it.year == year and it.level == level and it.theme == theme and it.slug == slug),
         None
     )
     if not match:
         raise Http404("document introuvable")
+
     pdf_url = settings.MEDIA_URL + quote(match.pdf_rel_path, safe="/")
     ctx = {"doc": match, "pdf_url": pdf_url, "debug": settings.DEBUG}
     return render(request, "cours/detail.html", ctx)

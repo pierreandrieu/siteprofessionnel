@@ -52,31 +52,34 @@ def scan(version: str) -> ArchiveTree:
     if not base.exists():
         return archives
 
-    for year_dir in sorted((p for p in base.iterdir() if p.is_dir()), key=lambda p: p.name, reverse=True):
+    for year_dir in sorted((p for p in base.iterdir() if p.is_dir() and not p.name.startswith(".")),
+                           key=lambda p: p.name, reverse=True):
         levels: LevelMap = {}
-
-        for first in sorted((p for p in year_dir.iterdir() if p.is_dir()), key=lambda p: p.name):
+        for first in sorted((p for p in year_dir.iterdir() if p.is_dir() and not p.name.startswith(".")),
+                            key=lambda p: p.name):
             level_dirs: List[Path] = []
             if dir_has_themes(first):
-                level_dirs.append(first)  # ancien layout
+                level_dirs.append(first)
             else:
                 try:
-                    for lvl in sorted((p for p in first.iterdir() if p.is_dir()), key=lambda p: p.name):
+                    for lvl in sorted((p for p in first.iterdir() if p.is_dir() and not p.name.startswith(".")),
+                                      key=lambda p: p.name):
                         if dir_has_themes(lvl):
-                            level_dirs.append(lvl)  # nouveau layout
+                            level_dirs.append(lvl)
                 except OSError:
                     pass
-
             for lvl_dir in level_dirs:
                 themes: ThemeMap = levels.setdefault(lvl_dir.name, {})
-
                 try:
-                    for th_dir in sorted((p for p in lvl_dir.iterdir() if p.is_dir()), key=lambda p: p.name):
+                    for th_dir in sorted(
+                            (p for p in lvl_dir.iterdir() if p.is_dir() and not p.name.startswith(".")),
+                            key=lambda p: p.name):
                         items: List[DocumentItem] = []
                         pdf_root = th_dir / "out" if (th_dir / "out").is_dir() else th_dir
                         for f in sorted(pdf_root.glob("*.pdf"), key=lambda p: p.name):
-                            if not f.is_file():
+                            if f.name.startswith(".") or not f.is_file():
                                 continue
+
                             rel_path = f.relative_to(base).as_posix()
                             try:
                                 size = f.stat().st_size
@@ -106,4 +109,3 @@ def prewarm() -> None:
         scan(version_token())
     except Exception:
         pass
-
