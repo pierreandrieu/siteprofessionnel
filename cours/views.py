@@ -5,7 +5,9 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 from typing import Dict, Final, Iterable, List, Tuple, Optional
+from datetime import date
 
+from django.utils import timezone
 from django.conf import settings
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import render
@@ -53,6 +55,25 @@ LEVEL_SLUG_TO_DIR: Final[Dict[str, str]] = {
 
 # mapping inverse utile pour fabriquer des liens
 LEVEL_DIR_TO_SLUG: Final[Dict[str, str]] = {v: k for k, v in LEVEL_SLUG_TO_DIR.items()}
+
+
+def current_school_year(today: date | None = None) -> str:
+    """
+    Retourne l'année scolaire courante au format 'YYYY-YYYY'.
+
+    Règle :
+      - du 1er août au 31 décembre : "année_courante-(année_courante+1)"
+      - du 1er janvier au 31 juillet      : "(année_courante-1)-année_courante"
+    """
+    d = today or timezone.localdate()
+    # (si tu préfères éviter timezone : d = date.today())
+    if d.month >= 8:
+        start = d.year
+        end = d.year + 1
+    else:
+        start = d.year - 1
+        end = d.year
+    return f"{start}-{end}"
 
 
 def _media_root() -> Path:
@@ -142,33 +163,63 @@ def index(request: HttpRequest) -> HttpResponse:
     /cours/ : Années (desc) → Établissements → Niveaux (cliquables)
     """
     base = _media_root() / "documents"
-    # items = build_index()
 
-    if not base.exists():  # ← garde-fou prod
-        ctx = {"by_year_institutions": [], "debug": settings.DEBUG}
+    if not base.exists():  # garde-fou prod
+        ctx = {
+            "current_year_block": None,
+            "archive_blocks": [],
+            "debug": settings.DEBUG,
+        }
         return render(request, "cours/index.html", ctx)
 
-    # Construire (année → établissement → {niveaux})
-    by_year_institutions: List[Tuple[str, List[Tuple[str, List[str]]]]] = []
-    # structure: [(year, [(institution, [level, ...]), ...]), ...]
-
-    for year_dir in sorted((p for p in base.iterdir() if p.is_dir() and not _hidden(p)), key=lambda p: p.name):
+    # 1) Construire un dict year -> [(institution, [levels...]), ...]
+    year_blocks: Dict[str, List[Tuple[str, List[str]]]] = {}
+    for year_dir in (p for p in base.iterdir() if p.is_dir() and not _hidden(p)):
         year = year_dir.name
         inst_to_levels: Dict[str, set] = defaultdict(set)
         for institution, level_dir in _iter_level_dirs(year_dir):
             inst_to_levels[institution].add(level_dir.name)
 
         if inst_to_levels:
-            inst_blocks = [
-                (inst, sorted(levels)) for inst, levels in inst_to_levels.items()
-            ]
-            # tri alphabétique des établissements
+            inst_blocks = [(inst, sorted(levels)) for inst, levels in inst_to_levels.items()]
+            # tri alphabétique des établissements pour stabilité
             inst_blocks.sort(key=lambda t: t[0].lower())
-            by_year_institutions.append((year, inst_blocks))
+            year_blocks[year] = inst_blocks
 
-    ctx = {"by_year_institutions": by_year_institutions, "debug": settings.DEBUG}
+    if not year_blocks:
+        ctx = {
+            "current_year_block": None,
+            "archive_blocks": [],
+            "debug": settings.DEBUG,
+        }
+        return render(request, "cours/index.html", ctx)
+
+    # 2) Déterminer l'année scolaire courante
+    cur_year = current_school_year()
+
+    def year_start_int(y: str) -> int:
+        try:
+            return int(y.split("-")[0])
+        except Exception:
+            return -1  # met les années "non standard" en fin
+
+    # 3) Construire le bloc "courant" (optionnel) et la liste "archives" (desc)
+    current_year_block: Optional[Tuple[str, List[Tuple[str, List[str]]]]] = None
+    if cur_year in year_blocks:
+        current_year_block = (cur_year, year_blocks[cur_year])
+
+    archive_blocks: List[Tuple[str, List[Tuple[str, List[str]]]]] = [
+        (y, year_blocks[y])
+        for y in sorted(year_blocks.keys(), key=year_start_int, reverse=True)
+        if y != cur_year
+    ]
+
+    ctx = {
+        "current_year_block": current_year_block,
+        "archive_blocks": archive_blocks,
+        "debug": settings.DEBUG,
+    }
     return render(request, "cours/index.html", ctx)
-
 
 def year_level(request: HttpRequest, year: str, level: str) -> HttpResponse:
     """

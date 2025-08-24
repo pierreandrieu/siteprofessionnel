@@ -7,7 +7,48 @@
     <div class="container py-4">
         <h1 class="display-6 mb-4">cours</h1>
 
-        {% for year, inst_list in by_year_institutions %}
+        {# --- Année courante (si présente) --- #}
+        {% if current_year_block %}
+            {% with year=current_year_block.0 inst_list=current_year_block.1 %}
+                <section class="mb-5">
+                    <h2 class="h4 fw-semibold mb-3 pb-2 border-bottom">
+                        {{ year }} <span class="badge text-bg-success ms-2">en cours</span>
+                    </h2>
+
+                    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+                        {% for inst_name, levels in inst_list %}
+                            <div class="col">
+                                <div class="card h-100 border-0 shadow-sm">
+                                    <div class="card-body">
+                                        <h3 class="h5 card-title mb-3">{{ inst_name }}</h3>
+
+                                        {% if levels %}
+                                            <div class="d-flex flex-wrap gap-2">
+                                                {% for level_dir in levels %}
+                                                    <a class="badge rounded-pill text-bg-primary text-decoration-none px-3 py-2"
+                                                       href="{% url 'cours:year_level' year=year level=level_dir %}">
+                                                        {{ level_dir|prettify|capfirst }}
+                                                    </a>
+                                                {% endfor %}
+                                            </div>
+                                        {% else %}
+                                            <div class="text-muted small">— aucun niveau —</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </section>
+            {% endwith %}
+        {% endif %}
+        {% if archive_blocks %}
+            <div class="position-sticky top-0 z-1 bg-body py-2 mb-3 shadow-sm border rounded text-center">
+                <strong>Archives</strong>
+            </div>
+        {% endif %}
+
+        {% for year, inst_list in archive_blocks %}
             <section class="mb-5">
                 <h2 class="h4 fw-semibold mb-3 pb-2 border-bottom">{{ year }}</h2>
 
