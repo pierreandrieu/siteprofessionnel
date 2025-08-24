@@ -1,17 +1,36 @@
+version: "3.9"
+
 services:
+  # Service "one-shot" pour préparer le FS hôte côté /var/www/*.
+  # - Crée les dossiers s'ils n'existent pas
+  # - Aligne propriétaire/groupe sur l'utilisateur hôte (UID/GID)
+  # - Pose des permissions lecture pour tous, écriture pour le propriétaire
+  #
+  # En effet, À chaque "up", ce service garantit que les répertoires
+  # utilisés par Django sont bien possédés par ton compte hôte. Ainsi,
+  # le script de publication peut écrire dedans SANS sudo, et le conteneur
+  # web, lui, ne fait que lire (montages :ro).
   init-fs:
     image: busybox:1.36
-    # Ensure dirs exist, then fix ownership and perms recursively (idempotent).
-    command: sh -c "install -d -o 10001 -g 10001 /host/static /host/media \
-      && chown -R 10001:10001 /host/static /host/media \
-      && chmod -R u+rwX,go+rX /host/static /host/media"
+    environment:
+      - UID=${UID:-1000}
+      - GID=${GID:-1000}
+    command: >
+      sh -eu -c '
+        mkdir -p /host/static /host/media &&
+        chown -R "$UID:$GID" /host/static /host/media &&
+        chmod -R u+rwX,go+rX /host/static /host/media
+      '
     volumes:
-      - /var/www/pierreandrieu/static:/host/static
-      - /var/www/pierreandrieu/media:/host/media
+      - /var/www/pierreandrieu/static:/host/static:rw
+      - /var/www/pierreandrieu/media:/host/media:rw
+    # On exécute une fois puis on s’arrête.
     restart: "no"
+
+  # Base de données Postgres
   db:
     image: postgres:16
-    env_file: .env.prod
+    env_file: .env.prod                    # POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB, etc.
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -28,24 +47,25 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  # Application Django + Gunicorn
   web:
     build: .
-    env_file: .env.prod
+    env_file: .env.prod                    # DJANGO_SECRET_KEY, DEBUG=0, ALLOWED_HOSTS, DB creds, etc.
     environment:
       ENVIRONMENT: production
       DJANGO_SETTINGS_MODULE: sitepro.settings.prod
       MEDIA_ROOT: /app/media
-
     depends_on:
       init-fs:
         condition: service_completed_successfully
       db:
         condition: service_healthy
     volumes:
+      # Lecture seule dans le conteneur
       - /var/www/pierreandrieu/static:/app/staticfiles:ro
       - /var/www/pierreandrieu/media:/app/media:ro
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:8000:8000"             # exposé en local, reverse-proxy nginx/traefik recommandé
     restart: unless-stopped
     logging:
       driver: json-file
@@ -53,51 +73,60 @@ services:
         max-size: "10m"
         max-file: "5"
     healthcheck:
-      test: [ "CMD-SHELL", "python - <<'PY'\nimport socket,sys\ns=socket.socket(); s.settimeout(2)\ntry:\n s.connect(('localhost',8000)); s.close(); sys.exit(0)\nexcept Exception:\n sys.exit(1)\nPY" ]
+      # check TCP sur Gunicorn
+      test:
+        [
+          "CMD-SHELL",
+          "python - <<'PY'\nimport socket,sys\ns=socket.socket(); s.settimeout(2)\n"
+          "try:\n s.connect(('localhost',8000)); s.close(); sys.exit(0)\n"
+          "except Exception:\n sys.exit(1)\nPY"
+        ]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 20s
-    read_only: true               # rend /app en lecture seule
+    # Durcissement : système de fichiers conteneur en lecture seule,
+    # tmpfs pour /tmp (Python/Django en a souvent besoin), pas de capacités Linux.
+    read_only: true
     tmpfs:
-      - /tmp                      # Python/Django peuvent écrire dans /tmp
+      - /tmp
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    # Limites
     deploy:
       resources:
         limits:
-          cpus: "4.0"      # optionnel
-          memory: 2g
-#  nginx:
-#    image: nginx:1.27-alpine
-#    ports: [ "80:80", "443:443" ]
-#    volumes:
-#      - ./nginx/conf.d:/etc/nginx/conf.d:ro
-#      - /etc/letsencrypt:/etc/letsencrypt:ro 
-#      - static:/var/www/static:ro
-#      - media:/var/www/media:ro
-#    depends_on:
-#      web:
-#        condition: service_healthy
-#    restart: unless-stopped
-#    logging:
-#      driver: json-file
-#      options:
-#        max-size: "10m"
-#        max-file: "5"
-#    read_only: true
-#    tmpfs:
-#      - /var/run
-#      - /var/cache/nginx
-#    security_opt:
-#      - no-new-privileges:true
-#    cap_drop:
-#      - ALL
+          cpus: "4.0"
+          memory: 4g
+
+  # Exemple de reverse proxy (désactivé ici) :
+  # nginx:
+  #   image: nginx:1.27-alpine
+  #   ports: ["80:80", "443:443"]
+  #   volumes:
+  #     - ./nginx/conf.d:/etc/nginx/conf.d:ro
+  #     - /etc/letsencrypt:/etc/letsencrypt:ro
+  #     - /var/www/pierreandrieu/static:/var/www/static:ro
+  #     - /var/www/pierreandrieu/media:/var/www/media:ro
+  #   depends_on:
+  #     web:
+  #       condition: service_healthy
+  #   restart: unless-stopped
+  #   logging:
+  #     driver: json-file
+  #     options:
+  #       max-size: "10m"
+  #       max-file: "5"
+  #   read_only: true
+  #   tmpfs:
+  #     - /var/run
+  #     - /var/cache/nginx
+  #   security_opt:
+  #     - no-new-privileges:true
+  #   cap_drop:
+  #     - ALL
 
 volumes:
   postgres_data:
-#  static:
-#  media:
-#  certs:
