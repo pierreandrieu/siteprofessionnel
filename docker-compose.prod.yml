@@ -2,27 +2,26 @@
 # Remarque: le champ "version" est obsolète avec Compose v2, on le supprime.
 
 services:
-  # 1) Service utilitaire "init-fs" :
-  #    - Crée les dossiers host s'ils n'existent pas
-  #    - Applique owner/permissions sur /var/www/... côté hôte
-  #    - S'exécute une fois avant "web"
   init-fs:
     image: busybox:1.36
     environment:
-      # Ces deux variables sont lues depuis .env (ou --env-file)
-      UID: "${UID:-1000}"   # UID de l’utilisateur hôte qui publie les PDFs
-      GID: "${GID:-1000}"   # GID correspondant
+      # proprio du static : l'utilisateur du conteneur web (10001)
+      STATIC_UID: "10001"
+      STATIC_GID: "10001"
+      # proprio du media : ton utilisateur hôte (vient de .env.prod)
+      MEDIA_UID: "${UID:-1001}"
+      MEDIA_GID: "${GID:-1001}"
     command: >
       sh -euxc '
-        echo "[init-fs] target owner=${UID}:${GID}";
-        install -d -o ${UID} -g ${GID} /host/static /host/media;
-        chown -R ${UID}:${GID} /host/static /host/media;
+        echo "[init-fs] static -> $STATIC_UID:$STATIC_GID ; media -> $MEDIA_UID:$MEDIA_GID";
+        install -d -o "$STATIC_UID" -g "$STATIC_GID" /host/static;
+        install -d -o "$MEDIA_UID"  -g "$MEDIA_GID"  /host/media;
+        chown -R "$STATIC_UID:$STATIC_GID" /host/static;
+        chown -R "$MEDIA_UID:$MEDIA_GID"  /host/media;
         chmod -R u+rwX,go+rX /host/static /host/media;
-        echo "[init-fs] done";
         ls -ldn /host/static /host/media || true
       '
     volumes:
-      # Montages en lecture/écriture côté "init-fs" (il doit pouvoir chown/chmod)
       - type: bind
         source: /var/www/pierreandrieu/static
         target: /host/static
@@ -32,6 +31,7 @@ services:
         target: /host/media
         read_only: false
     restart: "no"
+
 
   # 2) Base de données
   db:
@@ -68,7 +68,7 @@ services:
       - type: bind
         source: /var/www/pierreandrieu/static
         target: /app/staticfiles
-        read_only: true
+        read_only: false
       - type: bind
         source: /var/www/pierreandrieu/media
         target: /app/media
@@ -94,7 +94,7 @@ services:
       resources:
         limits:
           cpus: "4.0"
-          memory: 2g
+          memory: 4g
 
 volumes:
   postgres_data:
