@@ -38,8 +38,8 @@ class DoitEtreDansPremieresRangees(Contrainte):
     def code_machine(self) -> Dict[str, Any]:
         return {"type": self.type_contrainte().value, "eleve": self.eleve.nom(), "k": self.k}
 
-    def regles_asp(self, ctx: ASPContext) -> Sequence[str]:
-        s = ctx.sid(self.eleve)
+    def regles_asp(self, ctx: ASPContext) -> list[str]:
+        s = ctx.id_par_eleve[self.eleve]
         return [f":- assign({s},_,Y,_), Y >= {int(self.k)}."]
 
 
@@ -77,8 +77,8 @@ class DoitEtreDansDernieresRangees(Contrainte):
     def code_machine(self) -> Dict[str, Any]:
         return {"type": self.type_contrainte().value, "eleve": self.eleve.nom(), "k": self.k}
 
-    def regles_asp(self, ctx: ASPContext) -> Sequence[str]:
-        s = ctx.sid(self.eleve)
+    def regles_asp(self, ctx: ASPContext) -> list[str]:
+        s = ctx.id_par_eleve[self.eleve]
         min_rang = max(0, self._max_y - self.k + 1)
         return [f":- assign({s},_,Y,_), Y < {min_rang}."]
 
@@ -112,8 +112,8 @@ class DoitEtreSeulALaTable(Contrainte):
     def code_machine(self) -> Dict[str, Any]:
         return {"type": self.type_contrainte().value, "eleve": self.eleve.nom()}
 
-    def regles_asp(self, ctx: ASPContext) -> Sequence[str]:
-        s = ctx.sid(self.eleve)
+    def regles_asp(self, ctx: ASPContext) -> list[str]:
+        s = ctx.id_par_eleve[self.eleve]
         return [f":- assign({s},X,Y,_), assign(S2,X,Y,_), S2 != {s}."]
 
 
@@ -183,6 +183,6 @@ class DoitEtreExactementIci(Contrainte):
             "seat": self.ou.siege,
         }
 
-    def regles_asp(self, ctx: ASPContext) -> Sequence[str]:
-        s = ctx.sid(self.eleve)
+    def regles_asp(self, ctx: ASPContext) -> list[str]:
+        s = ctx.id_par_eleve[self.eleve]
         return [f":- not assign({s},{self.ou.x},{self.ou.y},{self.ou.siege})."]

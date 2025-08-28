@@ -40,6 +40,4 @@ class TableDoitEtreVide(Contrainte):
         return {"type": self.type_contrainte().value, "x": self.x, "y": self.y}
 
     def regles_asp(self, ctx: ASPContext) -> Sequence[str]:
-        # Le programme fixe contient déjà: ":- ban_table(X,Y), assign(_,X,Y,_)."
         return [f"ban_table({self.x},{self.y})."]
-

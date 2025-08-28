@@ -36,8 +36,9 @@ class DoiventEtreEloignes(Contrainte):
     def code_machine(self) -> Dict[str, Any]:
         return {"type": self.type_contrainte().value, "a": self.a.nom(), "b": self.b.nom(), "d": self.d}
 
-    def regles_asp(self, ctx: ASPContext) -> Sequence[str]:
-        a, b, d = ctx.sid(self.a), ctx.sid(self.b), int(self.d)
+    def regles_asp(self, ctx: ASPContext) -> list[str]:
+        a, b = ctx.sid(self.a), ctx.sid(self.b)
+        d = int(self.d)
         return [f":- assign({a},X1,Y1,_), assign({b},X2,Y2,_), |X1-X2| + |Y1-Y2| < {d}."]
 
 
@@ -69,7 +70,10 @@ class DoiventEtreSurMemeTable(Contrainte):
 
     def regles_asp(self, ctx: ASPContext) -> Sequence[str]:
         a, b = ctx.sid(self.a), ctx.sid(self.b)
-        return [f":- assign({a},X1,Y1,_), assign({b},X2,Y2,_), (X1 != X2; Y1 != Y2)."]
+        return [
+            f":- assign({a},X1,Y1,_), assign({b},X2,Y2,_), X1 != X2.",
+            f":- assign({a},X1,Y1,_), assign({b},X2,Y2,_), Y1 != Y2.",
+        ]
 
 
 class DoiventEtreAdjacents(Contrainte):
@@ -100,5 +104,8 @@ class DoiventEtreAdjacents(Contrainte):
 
     def regles_asp(self, ctx: ASPContext) -> Sequence[str]:
         a, b = ctx.sid(self.a), ctx.sid(self.b)
-        # même table + sièges consécutifs
-        return [f":- assign({a},X1,Y1,S1), assign({b},X2,Y2,S2), (X1 != X2; Y1 != Y2; |S1-S2| != 1)."]
+        return [
+            f":- assign({a},X1,Y1,_), assign({b},X2,Y2,_), X1 != X2.",
+            f":- assign({a},X1,Y1,_), assign({b},X2,Y2,_), Y1 != Y2.",
+            f":- assign({a},_,_,S1), assign({b},_,_,S2), |S1-S2| != 1.",
+        ]
