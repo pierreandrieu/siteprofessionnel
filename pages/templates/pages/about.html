@@ -1,11 +1,277 @@
 {% extends "base.html" %}
-{% block title %}à propos — site pro{% endblock %}
+{% block title %}À propos{% endblock %}
+
 {% block content %}
-    <h1 class="h3 mb-3">à propos</h1>
-    <p>Mon profil.</p>
-    <ul>
-        <li>ingénierie pédagogique / nsi</li>
-        <li>développement python / django</li>
-        <li>projet “plan de classe” (asp/clingo à venir)</li>
-    </ul>
+
+    <div class="container py-4">
+        <div class="labeled-hr"><span>Enseignement &amp; projets en cours</span></div>
+
+        <div class="row g-4 align-items-start mb-2">
+            <div class="col-lg-8">
+                <div class="callout">
+                    <p class="lead mb-1">
+                        Professeur de <abbr title="Numérique et Sciences Informatiques">NSI</abbr> au
+                        <a href="https://lyc-prevert-longjumeau.ac-versailles.fr/" target="_blank" rel="noopener">
+                            lycée Jacques Prévert (Longjumeau)
+                        </a>.
+                    </p>
+                    <span class="badge rounded-pill text-bg-success mt-2">depuis 2023</span>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body">
+                        <h2 class="h6 mb-3">Profils &amp; liens</h2>
+                        <div class="d-grid gap-2">
+                            <a class="btn btn-outline-dark icon-btn" href="https://github.com/pierreandrieu"
+                               target="_blank" rel="noopener">
+                                <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                                    <path d="M8 .2a8 8 0 0 0-2.53 15.6c.4.07.55-.17.55-.38v-1.34c-2.25.49-2.73-1.08-2.73-1.08-.37-.96-.9-1.22-.9-1.22-.74-.51.06-.5.06-.5.82.06 1.25.86 1.25.86.73 1.25 1.92.89 2.39.68.07-.53.29-.9.52-1.1-1.8-.2-3.7-.9-3.7-4.02 0-.89.32-1.6.85-2.17-.09-.21-.37-1.06.08-2.2 0 0 .7-.22 2.3.83A7.9 7.9 0 0 1 8 3.98c.71 0 1.43.1 2.1.28 1.6-1.05 2.3-.83 2.3-.83.45 1.14.17 1.99.08 2.2.53.57.85 1.28.85 2.17 0 3.13-1.9 3.82-3.71 4.02.3.26.56.77.56 1.56v2.32c0 .21.15.46.55.38A8 8 0 0 0 8 .2Z"></path>
+                                </svg>
+                                GitHub
+                            </a>
+                            <a class="btn btn-outline-success icon-btn" href="https://orcid.org/0000-0002-9876-9170"
+                               target="_blank" rel="noopener">
+                                <svg viewBox="0 0 256 256" fill="currentColor" aria-hidden="true">
+                                    <path d="M128 0a128 128 0 1 0 0 256A128 128 0 0 0 128 0zm-25.6 64h19.2v128h-19.2zm89.6 54.4c0 30.4-22.4 52.8-52.8 52.8h-22.4v-19.2h20.8c19.2 0 33.6-12.8 33.6-33.6 0-19.2-14.4-33.6-33.6-33.6h-20.8V66.4h22.4c30.4 0 52.8 22.4 52.8 52.8z"></path>
+                                </svg>
+                                ORCID
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <section class="mb-4">
+            <h2 class="visually-hidden">Développements en cours</h2>
+            <div class="row row-cols-1 row-cols-md-3 g-3">
+                <div class="col">
+                    <div class="card h-100 shadow-sm border-0">
+                        <div class="card-body">
+                            <h3 class="h6 mb-1">Ce site web</h3>
+                            <p class="text-muted mb-3">Ressources NSI/SNT et documents de cours et outil de génération de plans de classes.</p>
+                            <a class="btn btn-sm btn-outline-secondary" href="/">Retour à l’accueil</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="card h-100 shadow-sm border-0">
+                        <div class="card-body">
+                            <h3 class="h6 mb-1">Olympiades de NSI</h3>
+                            <p class="text-muted mb-3">Plateforme académique (Versailles).</p>
+                            <a class="btn btn-sm btn-outline-secondary" href="https://olympiades-nsi.ac-versailles.fr/"
+                               target="_blank" rel="noopener">Voir la plateforme</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="card h-100 shadow-sm border-0">
+                        <div class="card-body">
+                            <h3 class="h6 mb-1">corankco (Python)</h3>
+                            <p class="text-muted mb-3">Agrégation de classements incomplets avec égalités.</p>
+                            <a class="btn btn-sm btn-outline-secondary" href="https://pypi.org/project/corankco/"
+                               target="_blank" rel="noopener">PyPI</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <div class="labeled-hr"><span>Parcours antérieur</span></div>
+
+        <section class="timeline mb-4">
+            <div class="t-item">
+                <div class="small text-muted">2021–2022</div>
+                <div>
+                    <strong>Postdoctorant</strong> —
+                    <a href="https://www.lisn.upsaclay.fr/" target="_blank" rel="noopener">
+                        Laboratoire Interdisciplinaire des Sciences du Numérique (LISN)
+                    </a> &amp;
+                    <a href="https://www.imo.universite-paris-saclay.fr/fr/" target="_blank" rel="noopener">
+                        Laboratoire de Mathématiques d’Orsay (LMO)
+                    </a>,
+                    <a href="https://www.universite-paris-saclay.fr/" target="_blank" rel="noopener">
+                        Université Paris-Saclay
+                    </a>.
+                </div>
+            </div>
+            <div class="t-item">
+                <div class="small text-muted">2020–2021</div>
+                <div>
+                    <strong>Attaché temporaire d’enseignement et de recherche (ATER)</strong> —
+                    <a href="https://www.polytech.universite-paris-saclay.fr/" target="_blank" rel="noopener"> Polytech Paris-Saclay </a>,
+                    <a href="https://www.universite-paris-saclay.fr/" target="_blank" rel="noopener">Université
+                        Paris-Saclay</a>.
+                </div>
+            </div>
+            <div class="t-item mb-0">
+                <div class="small text-muted">2017–2021</div>
+                <div>
+                    <strong>Doctorant enseignant</strong> —
+                    <a href="https://www.lisn.upsaclay.fr/research/research-departments/science-des-donnees-2/bioinfo/?lang=en"
+                       target="_blank" rel="noopener">
+                        Équipe bioinformatique
+                    </a>,
+                    <a href="https://www.lisn.upsaclay.fr/" target="_blank" rel="noopener">Laboratoire
+                        Interdisciplinaire des Sciences du Numérique (LISN)</a>,
+                    <a href="https://www.universite-paris-saclay.fr/" target="_blank" rel="noopener">Université
+                        Paris-Saclay</a>.
+                </div>
+            </div>
+        </section>
+
+        <section class="mb-2">
+            <h2 class="h6 mb-3">Enseignements universitaires (sélection)</h2>
+
+            <div class="mb-3">
+                <div class="fw-semibold mb-1">Polytech Paris-Saclay (PEIP1)</div>
+                <div class="d-flex flex-wrap gap-2">
+                    <span class="pill">Introduction à la programmation (TD-TP)</span>
+                    <span class="pill">Programmation impérative (TD-TP)</span>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <div class="fw-semibold mb-1">Licence (L1–L3)</div>
+                <div class="d-flex flex-wrap gap-2">
+                    <span class="pill">Sécurité informatique (TD)</span>
+                    <span class="pill">Algorithmique avancée (TD)</span>
+                    <span class="pill">Introduction à la POO (TP)</span>
+                    <span class="pill">Analyse de données biologiques (TP)</span>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <div class="fw-semibold mb-1">Master Bioinformatique (M1/M2)</div>
+                <div class="d-flex flex-wrap gap-2">
+                    <span class="pill">Programmation orientée objet (TP)</span>
+                    <span class="pill">Informatique théorique (TD)</span>
+                </div>
+            </div>
+
+            <div>
+                <div class="fw-semibold mb-1">IUT Cachan (1<sup>re</sup> année)</div>
+                <div class="d-flex flex-wrap gap-2">
+                    <span class="pill">Génie logiciel (cours intégré / TD-TP)</span>
+                    <span class="pill">Projet de génie logiciel</span>
+                </div>
+            </div>
+        </section>
+
+        <div class="labeled-hr"><span>Publications</span></div>
+
+        <section class="mb-4">
+            <ol class="list-group list-group-flush">
+                <!-- IJAR 2023 -->
+                <li class="list-group-item border-0 px-0">
+                    <div class="d-flex flex-column gap-1">
+                        <div class="small text-muted">International Journal of Approximate Reasoning · 2023</div>
+                        <div class="fw-semibold">
+                            A unifying rank aggregation framework to suitably and efficiently aggregate any kind of
+                            rankings
+                        </div>
+                        <div class="small">
+                            Pierre Andrieu; Sarah Cohen-Boulakia; Miguel Couceiro; Alain Denise; Adeline Pierrot
+                        </div>
+                        <div class="small">
+                            DOI&nbsp;:
+                            <a href="https://doi.org/10.1016/j.ijar.2023.109035" target="_blank" rel="noopener">
+                                10.1016/j.ijar.2023.109035
+                            </a>
+                            <span class="text-muted"> · ISSN&nbsp;: 0888-613X</span>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2 mt-1">
+                            <a class="btn btn-sm btn-outline-secondary"
+                               href="https://inria.hal.science/hal-04227695v1/document" target="_blank" rel="noopener">PDF
+                                HAL</a>
+                            <a class="btn btn-sm btn-outline-secondary"
+                               href="https://doi.org/10.1016/j.ijar.2023.109035" target="_blank" rel="noopener">DOI</a>
+                        </div>
+                    </div>
+                </li>
+
+                <!-- FGCS 2021 -->
+                <li class="list-group-item border-0 px-0">
+                    <div class="d-flex flex-column gap-1">
+                        <div class="small text-muted">Future Generation Computer Systems · 2021</div>
+                        <div class="fw-semibold">
+                            Efficient, robust and effective rank aggregation for massive biological datasets
+                        </div>
+                        <div class="small">
+                            Pierre Andrieu; Sarah Cohen-Boulakia; Miguel Couceiro; Alain Denise; Adeline Pierrot
+                        </div>
+                        <div class="small">
+                            DOI&nbsp;:
+                            <a href="https://doi.org/10.1016/j.future.2021.06.013" target="_blank" rel="noopener">
+                                10.1016/j.future.2021.06.013
+                            </a>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2 mt-1">
+                            <a class="btn btn-sm btn-outline-secondary"
+                               href="https://hal.science/hal-03388443/document" target="_blank" rel="noopener">PDF
+                                HAL</a>
+                            <a class="btn btn-sm btn-outline-secondary"
+                               href="https://doi.org/10.1016/j.future.2021.06.013" target="_blank"
+                               rel="noopener">DOI</a>
+                        </div>
+                    </div>
+                </li>
+
+                <!-- eScience 2019 -->
+                <li class="list-group-item border-0 px-0">
+                    <div class="d-flex flex-column gap-1">
+                        <div class="small text-muted">2019 IEEE International Conference on eScience · 2019</div>
+                        <div class="fw-semibold">
+                            Reliability-Aware and Graph-Based Approach for Rank Aggregation of Biological Data
+                        </div>
+                        <div class="small">
+                            Pierre Andrieu; Sarah Cohen-Boulakia; Miguel Couceiro; Alain Denise; Adeline Pierrot
+                        </div>
+                        <div class="small">
+                            DOI&nbsp;:
+                            <a href="https://doi.org/10.1109/eScience.2019.00022" target="_blank" rel="noopener">
+                                10.1109/eScience.2019.00022
+                            </a>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2 mt-1">
+                            <a class="btn btn-sm btn-outline-secondary"
+                               href="https://hal.science/hal-02527738v1/document" target="_blank" rel="noopener">PDF
+                                HAL</a>
+                            <a class="btn btn-sm btn-outline-secondary"
+                               href="https://doi.org/10.1109/eScience.2019.00022" target="_blank" rel="noopener">DOI</a>
+                        </div>
+                    </div>
+                </li>
+
+                <!-- Thèse 2021 -->
+                <li class="list-group-item border-0 px-0">
+                    <div class="d-flex flex-column gap-1">
+                        <div class="small text-muted">Thèse de doctorat · 2021</div>
+                        <div class="fw-semibold">
+                            Passage à l’échelle, propriétés et qualité des algorithmes de classements consensuels
+                            pour les données biologiques massives
+                        </div>
+                        <div class="small">Pierre Andrieu</div>
+                        <div class="small">
+                            Notice&nbsp;:
+                            <a href="https://theses.hal.science/tel-03335281" target="_blank" rel="noopener">HAL&nbsp;:
+                                tel-03335281</a>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2 mt-1">
+                            <a class="btn btn-sm btn-outline-secondary"
+                               href="https://theses.hal.science/tel-03335281v1" target="_blank" rel="noopener">PDF
+                                HAL</a>
+                            <a class="btn btn-sm btn-outline-secondary"
+                               href="https://theses.hal.science/tel-03335281" target="_blank" rel="noopener">Notice
+                                HAL</a>
+                        </div>
+                    </div>
+                </li>
+            </ol>
+        </section>
+
+    </div>
 {% endblock %}
