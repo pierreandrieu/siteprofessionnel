@@ -53,3 +53,114 @@ a:hover {
     padding: .5rem;
     border-bottom: 1px solid #e9ecef;
 }
+
+.timeline {
+    border-left: 2px solid var(--bs-border-color);
+    padding-left: 1rem;
+}
+
+.timeline .t-item {
+    position: relative;
+    margin-bottom: .75rem;
+}
+
+.timeline .t-item::before {
+    content: "";
+    position: absolute;
+    left: -10px;
+    top: .35rem;
+    width: .55rem;
+    height: .55rem;
+    border-radius: 50%;
+    background: var(--bs-secondary-bg);
+    border: 2px solid var(--bs-border-color);
+}
+
+.pill {
+    display: inline-block;
+    padding: .25rem .6rem;
+    border-radius: 999px;
+    border: 1px solid var(--bs-border-color);
+    font-size: .9rem;
+}
+
+.callout {
+    background: var(--bs-body-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: .75rem;
+    padding: 1rem 1.25rem;
+}
+
+.callout .lead {
+    font-size: 1.25rem;
+}
+
+.labeled-hr {
+    display: grid;
+    place-items: center;
+    grid-template-columns: 1fr auto 1fr;
+    gap: .75rem;
+    margin: 1.5rem 0 1rem;
+}
+
+.labeled-hr::before, .labeled-hr::after {
+    content: "";
+    height: 1px;
+    width: 100%;
+    background: var(--bs-border-color);
+}
+
+.labeled-hr span {
+    padding: .25rem .75rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: .95rem;
+    background: var(--bs-body-bg);
+}
+
+.icon-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+}
+
+.icon-btn svg {
+    width: 1.1rem !important;
+    height: 1.1rem !important;
+    flex: 0 0 auto;
+    fill: currentColor;
+}
+
+
+.callout .lead {
+    margin-bottom: .35rem;
+}
+
+.callout .badge {
+    margin-top: .35rem;
+}
+
+/* Publications : lisibilité et sobriété */
+.list-group-flush .list-group-item {
+    background: transparent;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.list-group-flush .list-group-item + .list-group-item {
+    border-top: 1px dashed var(--bs-border-color);
+}
+
+.callout p + ul {
+    margin-top: .5rem;
+}
+
+.callout .small {
+    display: block;
+    margin-top: .5rem;
+}
+
+.card .btn {
+    white-space: nowrap;
+}
