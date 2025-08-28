@@ -72,7 +72,7 @@ services:
       - type: bind
         source: /var/www/pierreandrieu/media
         target: /app/media
-        read_only: true
+        read_only: false
     ports:
       - "127.0.0.1:8000:8000"
     restart: unless-stopped
@@ -95,6 +95,16 @@ services:
         limits:
           cpus: "4.0"
           memory: 4g
+
+  redis:
+    image: redis:7-alpine
+    # comments in English
+    command: [ "redis-server","--save","", "--appendonly","no", "--maxmemory","256mb", "--maxmemory-policy","allkeys-lru" ]
+    # No volumes: all in RAM; or use a tmpfs if you veux for /data:
+    tmpfs:
+      - /data
+    restart: unless-stopped
+    security_opt: [ "no-new-privileges:true" ]
 
 volumes:
   postgres_data:
