@@ -190,10 +190,6 @@ a:hover {
     fill: rgba(11, 87, 208, 0.12);
 }
 
-.seat-forbidden {
-    fill: #eef2f6;
-}
-
 .seat-selected {
     stroke: #ffc107 !important;
     stroke-width: 3;

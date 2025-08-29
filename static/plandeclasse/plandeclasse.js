@@ -1,15 +1,15 @@
 "use strict";
 
 /**
- * Class plan – stateful, no framework.
- * Changes in this version:
- * - SVG click listener attached once (in init), not in renderRoom().
- * - Re-clicking own seat fully deselects student + seat.
- * - Clicking a free seat with no student selected toggles forbidden state
- *   and updates visuals + constraint pills.
+ * Classroom planner – UI only (RAM), no framework.
+ * - Name labels auto-fit to seat rectangle.
+ * - Clicking an empty seat only (de)selects it; banning is button-driven.
+ * - Auto-clear selection after placing or swapping.
+ * - Forbidden seats have a hatched fill and distinct border.
+ * - Thin dividers between adjacent seats on the same table.
  */
 
-/* ========= STATE ========= */
+/* ========= GLOBAL STATE ========= */
 const state = {
     students: [], // {id, name, gender|null, first, last}
     selection: {studentId: null, seatKey: null}, // "x,y,s"
@@ -26,46 +26,23 @@ const state = {
 const $ = (sel) => document.querySelector(sel);
 const keyOf = (x, y, s) => `${x},${y},${s}`;
 
+/** Split name by rule: initial run of ALL-CAPS tokens (with spaces/hyphens) = last name; remainder = first name(s). */
 function splitName(full) {
-    // Rule: last name is the initial run of tokens written in FULL UPPERCASE
-    // (unicode-aware), where tokens may contain hyphens or apostrophes.
-    // Everything after that run is the first name(s).
-    // Examples:
-    //  "DUPONT Alice"              -> last="DUPONT",        first="Alice"
-    //  "LE BRUN Jean-Paul"         -> last="LE BRUN",       first="Jean-Paul"
-    //  "LE-BRUN JEAN PAUL"         -> last="LE-BRUN JEAN",  first="PAUL" (edge, all caps -> all last, first empty)
-    //  "DU PONT Marie Anne"        -> last="DU PONT",       first="Marie Anne"
-    //  "Martin DUPONT"             -> last="DUPONT",        first="Martin"  (no initial uppercase run -> last="")
-    //
-    // Implementation details:
-    //  - A token is "uppercase" if, after removing hyphens and apostrophes, it equals
-    //    its own toLocaleUpperCase() in 'fr-FR' and has at least one A–Z (incl. accents).
-    //  - We stop the last-name run at the first token that isn't uppercase by that rule.
-
     const cleaned = (full || "").trim().replace(/\s+/g, " ");
     if (!cleaned) return {first: "", last: ""};
-
     const tokens = cleaned.split(" ");
     const isUpperToken = (tok) => {
         const core = tok.replace(/[-'’]/g, "");
-        // must contain at least one letter, and be equal to its uppercase form
-        const hasLetters = /[A-ZÀ-ÖØ-Þ]/.test(core); // covers Latin uppercase with accents
+        const hasLetters = /[A-ZÀ-ÖØ-Þ]/.test(core);
         return hasLetters && core === core.toLocaleUpperCase("fr-FR");
     };
-
     let i = 0;
     while (i < tokens.length && isUpperToken(tokens[i])) i++;
-
-    // If there was no initial uppercase run, treat entire string as "first"
-    if (i === 0) {
-        return {first: cleaned, last: ""};
-    }
-
+    if (i === 0) return {first: cleaned, last: ""};
     const last = tokens.slice(0, i).join(" ");
-    const first = tokens.slice(i).join(" ").trim(); // can be empty if all-caps input
+    const first = tokens.slice(i).join(" ").trim();
     return {first, last};
 }
-
 
 function disambiguate(list, primaryKey, secondaryKey, format) {
     const groups = new Map();
@@ -123,6 +100,26 @@ function computeMaxManhattan(schema) {
     return (rows - 1) + (maxCols - 1);
 }
 
+/** Update the “ban seat” button label and enabled state according to current selection. */
+function updateBanButtonLabel() {
+    const btn = document.getElementById("btnToggleBan");
+    if (!btn) return;
+
+    const k = state.selection.seatKey;
+    const occupied = k ? state.placements.has(k) : false;
+
+    // No seat selected OR seat occupied → disable
+    if (!k || occupied) {
+        btn.disabled = true;
+        btn.textContent = "le siège doit rester vide";
+        return;
+    }
+
+    const forbidden = state.forbidden.has(k);
+    btn.disabled = false;
+    btn.textContent = forbidden ? "rendre le siège disponible" : "le siège doit rester vide";
+}
+
 /* ========= CSV ========= */
 function parseCSV(text) {
     const lines = text.split(/\r?\n/).filter((l) => l.trim() !== "");
@@ -141,7 +138,73 @@ function parseCSV(text) {
     return rows;
 }
 
-/* ========= ROOM RENDER (SVG) ========= */
+/* ========= SVG RENDERING ========= */
+
+/** Append a <text> (with <tspan> if 2 lines) and shrink font until it fits W×H. */
+function appendSeatLabelFitted(svg, cx, cy, seatW, seatH, text, seatKey) {
+    const lines = String(text || "").split("\n");
+    const ns = "http://www.w3.org/2000/svg";
+
+    const textEl = document.createElementNS(ns, "text");
+    textEl.setAttribute("text-anchor", "middle");
+    textEl.setAttribute("class", "seat-name");
+    textEl.setAttribute("data-seat", seatKey);
+    svg.appendChild(textEl);
+
+    const tspans = [];
+    for (let i = 0; i < lines.length; i++) {
+        const tspan = document.createElementNS(ns, "tspan");
+        tspan.setAttribute("x", String(cx));
+        tspan.textContent = lines[i];
+        tspans.push(tspan);
+        textEl.appendChild(tspan);
+    }
+
+    const paddingX = 8;
+    const paddingY = 6;
+    const maxWidth = seatW - paddingX * 2;
+    const maxHeight = seatH - paddingY * 2;
+
+    let size = 22;
+    const minSize = 9;
+
+    while (size >= minSize) {
+        textEl.setAttribute("style", `font-size:${size}px;`);
+        const lineHeight = size * 1.1;
+        if (tspans.length === 1) {
+            textEl.setAttribute("x", String(cx));
+            textEl.setAttribute("y", String(cy));
+            tspans[0].setAttribute("dy", "0");
+        } else {
+            const totalH = lineHeight * 2;
+            const yTop = cy - totalH / 2 + lineHeight * 0.8;
+            textEl.setAttribute("y", String(yTop));
+            tspans[0].setAttribute("dy", "0");
+            tspans[1].setAttribute("x", String(cx));
+            tspans[1].setAttribute("dy", String(lineHeight));
+        }
+
+        const bbox = textEl.getBBox();
+        if (bbox.width <= maxWidth && bbox.height <= maxHeight) break;
+        size -= 1;
+    }
+
+    // Last-resort ellipsis on the last line if still too wide (rare)
+    const bbox = textEl.getBBox();
+    if (bbox.width > maxWidth && tspans.length) {
+        const last = tspans[tspans.length - 1];
+        const original = last.textContent || "";
+        if (original.length > 3) {
+            let cut = original.length - 1;
+            while (cut > 3) {
+                last.textContent = original.slice(0, cut) + "…";
+                if (textEl.getBBox().width <= maxWidth) break;
+                cut -= 1;
+            }
+        }
+    }
+}
+
 function renderRoom() {
     const svg = $("#roomCanvas");
     if (!svg) return;
@@ -153,16 +216,16 @@ function renderRoom() {
         return;
     }
 
-    // Dimensions tuned for readability
+    // Dimensions
     const padX = 20;
     const padY = 16;
-
     const seatW = 90;
     const tableH = 70;
-    const seatGap = 6;
-    const colGap = 20;
-    const rowGap = 38;
+    const seatGap = 6;   // horizontal gap between seats (we draw a divider inside)
+    const colGap = 20;   // gap between tables (columns)
+    const rowGap = 38;   // gap between rows
 
+    // Row widths (for centering under board)
     const rowWidths = state.schema.map((caps) => {
         const tablesW = caps.reduce((sum, cap) => sum + cap * seatW + (cap - 1) * seatGap, 0);
         const between = (caps.length - 1) * colGap;
@@ -175,6 +238,7 @@ function renderRoom() {
     const boardY = padY;
     const boardH = 16;
 
+    // Y of each row
     const rowOriginsY = [];
     let curY = boardY + boardH + 14;
     for (let y = 0; y < rows; y++) {
@@ -189,8 +253,33 @@ function renderRoom() {
     svg.style.minWidth = totalWidth + "px";
     svg.style.minHeight = Math.min(900, totalHeight) + "px";
 
+    const ns = "http://www.w3.org/2000/svg";
+
+    // --- defs: diagonal hatch pattern for forbidden seats ---
+    const defs = document.createElementNS(ns, "defs");
+    const pattern = document.createElementNS(ns, "pattern");
+    pattern.setAttribute("id", "forbidPattern");
+    pattern.setAttribute("patternUnits", "userSpaceOnUse");
+    pattern.setAttribute("width", "8");
+    pattern.setAttribute("height", "8");
+
+    const pBg = document.createElementNS(ns, "rect");
+    pBg.setAttribute("width", "8");
+    pBg.setAttribute("height", "8");
+    pBg.setAttribute("fill", "#f3f4f6");
+    pattern.appendChild(pBg);
+
+    const pLines = document.createElementNS(ns, "path");
+    pLines.setAttribute("d", "M0,8 l8,-8 M-2,2 l4,-4 M6,10 l4,-4");
+    pLines.setAttribute("stroke", "#cbd5e1");
+    pLines.setAttribute("stroke-width", "1");
+    pattern.appendChild(pLines);
+
+    defs.appendChild(pattern);
+    svg.appendChild(defs);
+
     // Board
-    const board = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    const board = document.createElementNS(ns, "rect");
     board.setAttribute("x", String(boardX));
     board.setAttribute("y", String(boardY));
     board.setAttribute("width", String(boardW));
@@ -198,7 +287,7 @@ function renderRoom() {
     board.setAttribute("class", "board-rect");
     svg.appendChild(board);
 
-    const boardLabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    const boardLabel = document.createElementNS(ns, "text");
     boardLabel.setAttribute("x", String(boardX + boardW / 2));
     boardLabel.setAttribute("y", String(boardY - 4));
     boardLabel.setAttribute("text-anchor", "middle");
@@ -207,7 +296,6 @@ function renderRoom() {
     svg.appendChild(boardLabel);
 
     const {firstMap, lastMap, bothMap} = buildDisplayMaps();
-    const approxCharW = 0.38;
 
     for (let y = 0; y < rows; y++) {
         const caps = state.schema[y];
@@ -221,7 +309,7 @@ function renderRoom() {
             const cap = caps[x];
             const tableWidth = cap * seatW + (cap - 1) * seatGap;
 
-            const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            const rect = document.createElementNS(ns, "rect");
             rect.setAttribute("x", String(ox));
             rect.setAttribute("y", String(oy));
             rect.setAttribute("width", String(tableWidth));
@@ -238,7 +326,7 @@ function renderRoom() {
                 const isForbidden = state.forbidden.has(seatKey);
                 const isSelectedSeat = state.selection.seatKey === seatKey;
 
-                const seatRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                const seatRect = document.createElementNS(ns, "rect");
                 seatRect.setAttribute("x", String(sx));
                 seatRect.setAttribute("y", String(sy));
                 seatRect.setAttribute("width", String(seatW));
@@ -250,7 +338,41 @@ function renderRoom() {
                     (isForbidden ? "seat-forbidden " : occupant != null ? "seat-occupied " : "seat-free ") +
                     (isSelectedSeat ? "seat-selected" : ""),
                 );
+
+                // Apply hatched fill for forbidden seats
+                if (isForbidden) {
+                    seatRect.setAttribute("fill", "url(#forbidPattern)");
+                    seatRect.setAttribute("stroke-width", "2");
+                } else {
+                    seatRect.removeAttribute("fill");
+                    seatRect.removeAttribute("stroke-width");
+                }
+
                 svg.appendChild(seatRect);
+
+// Croisillon d’overlay sur les sièges interdits
+                if (isForbidden) {
+                    const cross = document.createElementNS(ns, "path");
+                    const pad = 8;
+                    const x1 = sx + pad, y1 = sy + pad;
+                    const x2 = sx + seatW - pad, y2 = sy + tableH - pad;
+                    const x3 = sx + pad, y3 = sy + tableH - pad;
+                    const x4 = sx + seatW - pad, y4 = sy + pad;
+                    cross.setAttribute("d", `M${x1},${y1} L${x2},${y2} M${x3},${y3} L${x4},${y4}`);
+                    cross.setAttribute("class", "seat-forbidden-cross");
+                    svg.appendChild(cross);
+                }
+
+                // Thin divider between this seat and the next (inside the seatGap)
+                if (s < cap - 1) {
+                    const divider = document.createElementNS(ns, "rect");
+                    divider.setAttribute("x", String(sx + seatW + seatGap / 2 - 0.5));
+                    divider.setAttribute("y", String(sy + 6));
+                    divider.setAttribute("width", "1");
+                    divider.setAttribute("height", String(tableH - 12));
+                    divider.setAttribute("class", "seat-divider");
+                    svg.appendChild(divider);
+                }
 
                 if (occupant != null) {
                     const nm =
@@ -259,20 +381,9 @@ function renderRoom() {
                             : state.nameView === "last"
                                 ? lastMap.get(occupant) || ""
                                 : bothMap.get(occupant) || "";
-
-                    const longest = nm.split("\n").reduce((a, b) => (b.length > a ? b.length : a), 0);
-                    const target = Math.max(10, seatW - 16);
-                    const fontPx = Math.min(22, Math.max(11, Math.floor(target / (Math.max(1, longest) * approxCharW))));
-
-                    const tx = document.createElementNS("http://www.w3.org/2000/svg", "text");
-                    tx.setAttribute("x", String(sx + seatW / 2));
-                    tx.setAttribute("y", String(sy + tableH / 2));
-                    tx.setAttribute("text-anchor", "middle");
-                    tx.setAttribute("class", "seat-name");
-                    tx.setAttribute("style", `font-size:${fontPx}px;`);
-                    tx.setAttribute("data-seat", seatKey);
-                    tx.textContent = nm;
-                    svg.appendChild(tx);
+                    const cx = sx + seatW / 2;
+                    const cy = sy + tableH / 2;
+                    appendSeatLabelFitted(svg, cx, cy, seatW, tableH, nm, seatKey);
                 }
             }
             ox += tableWidth + colGap;
@@ -280,35 +391,35 @@ function renderRoom() {
     }
 }
 
-/* ========= SEAT INTERACTIONS ========= */
+/* ========= INTERACTIONS ========= */
 function seatClick(seatKey) {
-    // comments in English
     const occupant = state.placements.get(seatKey) ?? null;
     const selSid = state.selection.studentId;
 
     if (selSid != null) {
-        // Student selected -> place / swap / (de)select own
+        // A student is selected → place / permute / toggle on own seat
         if (state.forbidden.has(seatKey)) return;
 
         const prevSeat = state.placedByStudent.get(selSid) || null;
 
         if (occupant == null) {
-            // simple move
+            // Move to empty seat
             if (prevSeat) state.placements.delete(prevSeat);
             state.placements.set(seatKey, selSid);
             state.placedByStudent.set(selSid, seatKey);
-            state.selection.seatKey = seatKey;
+            // Auto-clear selection after placing
+            state.selection.studentId = null;
+            state.selection.seatKey = null;
         } else if (occupant === selSid) {
-            // clicked own seat
+            // Clicked own seat → toggle (de)selection
             if (state.selection.seatKey === seatKey) {
-                // full deselect
                 state.selection.studentId = null;
                 state.selection.seatKey = null;
             } else {
                 state.selection.seatKey = seatKey;
             }
         } else {
-            // swap with another occupant
+            // Swap with another occupant
             if (prevSeat) {
                 state.placements.set(prevSeat, occupant);
                 state.placedByStudent.set(occupant, prevSeat);
@@ -318,45 +429,30 @@ function seatClick(seatKey) {
             }
             state.placements.set(seatKey, selSid);
             state.placedByStudent.set(selSid, seatKey);
-            state.selection.seatKey = seatKey;
+            // Auto-clear selection after swap
+            state.selection.studentId = null;
+            state.selection.seatKey = null;
         }
         renderRoom();
         renderStudents();
+        updateBanButtonLabel();
         return;
     }
 
     // No student selected
     if (occupant != null) {
-        // select occupant + seat
+        // Select the occupant (and its seat)
         state.selection.studentId = occupant;
         state.selection.seatKey = seatKey;
-        renderStudents();
-        renderRoom();
-        return;
+    } else {
+        // FREE seat: only (de)select it; DO NOT toggle forbidden here
+        state.selection.seatKey = state.selection.seatKey === seatKey ? null : seatKey;
+        state.selection.studentId = null;
     }
 
-    // No student selected + free seat -> toggle forbidden directly
-    if (state.forbidden.has(seatKey)) {
-        state.forbidden.delete(seatKey);
-        const idx = state.constraints.findIndex(
-            (c) => c.type === "forbid_seat" && `${c.x},${c.y},${c.s}` === seatKey,
-        );
-        if (idx >= 0) state.constraints.splice(idx, 1);
-    } else {
-        state.forbidden.add(seatKey);
-        const [x, y, s] = seatKey.split(",").map(Number);
-        state.constraints.push({
-            type: "forbid_seat",
-            x,
-            y,
-            s,
-            human: `siège (x=${x}, y=${y}, s=${s}) doit rester vide`,
-            key: seatKey,
-        });
-    }
-    state.selection.seatKey = seatKey;
+    renderStudents();
     renderRoom();
-    renderConstraints();
+    updateBanButtonLabel();
 }
 
 function onCanvasClick(ev) {
@@ -389,8 +485,13 @@ function toggleSelectedSeatBan() {
             key: k,
         });
     }
+    // Exit “ban mode”: clear selection
+    state.selection.seatKey = null;
+    state.selection.studentId = null;
+
     renderRoom();
     renderConstraints();
+    updateBanButtonLabel();
 }
 
 function unassignSelected() {
@@ -402,6 +503,7 @@ function unassignSelected() {
         state.placedByStudent.delete(sid);
         renderRoom();
         renderStudents();
+        updateBanButtonLabel();
     }
 }
 
@@ -433,7 +535,7 @@ function applySchema(rows, tablesPerRow, capacitiesStr) {
     state.placements = newPlacements;
     state.placedByStudent = newPlacedByStudent;
 
-    // Keep only valid forbidden seats
+    // Keep only valid forbidden seats and sync constraints
     const newForbidden = new Set();
     const newForbidConstraints = [];
     for (const k of state.forbidden) {
@@ -456,9 +558,10 @@ function applySchema(rows, tablesPerRow, capacitiesStr) {
     renderRoom();
     renderStudents();
     renderConstraints();
+    updateBanButtonLabel();
 }
 
-/* ========= STUDENTS ========= */
+/* ========= STUDENTS LIST ========= */
 function renderStudents() {
     const unplaced = $("#studentsUnplaced");
     const placed = $("#studentsPlaced");
@@ -497,6 +600,7 @@ function renderStudents() {
             }
             renderStudents();
             renderRoom();
+            updateBanButtonLabel();
         });
 
         if (state.placedByStudent.has(st.id)) placed.appendChild(card);
@@ -504,7 +608,7 @@ function renderStudents() {
     }
 }
 
-/* ========= CONSTRAINTS ========= */
+/* ========= CONSTRAINTS (UI ONLY) ========= */
 function refreshConstraintSelectors() {
     const a = $("#cstStudentA");
     const b = $("#cstStudentB");
@@ -632,6 +736,7 @@ function renderConstraints() {
                 }
                 state.constraints.splice(idx, 1);
                 renderConstraints();
+                updateBanButtonLabel();
             }
         });
 
@@ -642,11 +747,11 @@ function renderConstraints() {
 
 /* ========= INIT ========= */
 function init() {
-    // Attach canvas click ONCE
+    // Attach one delegated click listener on the SVG
     const canvas = document.getElementById("roomCanvas");
     if (canvas) canvas.addEventListener("click", onCanvasClick);
 
-    // CSV import
+    // CSV
     const csvInput = $("#csvInput");
     if (csvInput) {
         csvInput.addEventListener("change", async (ev) => {
@@ -663,10 +768,11 @@ function init() {
             refreshConstraintSelectors();
             renderStudents();
             renderRoom();
+            updateBanButtonLabel();
         });
     }
 
-    // Room schema controls
+    // Schema
     $("#btnBuildRoom")?.addEventListener("click", () => {
         const rows = Number($("#rowsCount").value);
         const tpr = Number($("#tablesPerRow").value);
@@ -686,6 +792,7 @@ function init() {
         renderRoom();
         renderStudents();
         renderConstraints();
+        updateBanButtonLabel();
     });
 
     // Options
@@ -723,6 +830,7 @@ function init() {
     renderStudents();
     refreshConstraintSelectors();
     onConstraintTypeChange();
+    updateBanButtonLabel();
 }
 
 window.addEventListener("DOMContentLoaded", init);

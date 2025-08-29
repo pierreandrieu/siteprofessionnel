@@ -48,9 +48,22 @@
 
 /* stronger visual for forbidden seats */
 .seat-forbidden {
-    fill: #e5e7eb;
-    stroke: #9ca3af;
-    stroke-dasharray: 4 3;
+    stroke: #9aa4b2 !important;
+    stroke-width: 10px; /* << épaisseur de bordure visible */
+    stroke-dasharray: 7 3;
+    fill: url(#forbidPattern) !important; /* << au cas où l'attribut fill serait absent */
+}
+/* vertical separators between seats */
+.seat-divider {
+    fill: #e2e8f0;
+    opacity: 0.9;
+}
+
+.seat-forbidden-cross {
+    stroke: #9aa4b2;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    opacity: .9;
 }
 
 .seat-selected {
