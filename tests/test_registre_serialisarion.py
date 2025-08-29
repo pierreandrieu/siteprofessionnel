@@ -26,7 +26,7 @@ def test_serialisation_roundtrip():
     data = json.dumps(codes, ensure_ascii=False)
 
     # reconstruction via registre/fabriques
-    ctx = ContexteFabrique(salle=salle, index_eleves_par_nom={e.nom(): e for e in eleves})
+    ctx = ContexteFabrique(salle=salle, index_eleves_par_nom={e.nom: e for e in eleves})
     back = [contrainte_depuis_code(c, ctx) for c in json.loads(data)]
 
     assert [c.code_machine() for c in back] == codes

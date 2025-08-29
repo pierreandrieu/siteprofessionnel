@@ -23,6 +23,8 @@ urlpatterns = [
     # app cours (index, par niveau, détail)
     path("cours/", include(("cours.urls", "cours"), namespace="cours")),
 
+    path("plandeclasse/", include(("plandeclasse.urls", "plandeclasse"), namespace="plandeclasse")),
+
     path(
         "robots.txt",
         TemplateView.as_view(template_name="pages/robots.txt", content_type="text/plain"),

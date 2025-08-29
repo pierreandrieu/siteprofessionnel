@@ -36,7 +36,7 @@ class DoitEtreDansPremieresRangees(Contrainte):
         return f"{self.eleve.affichage_nom()} doit être dans les {self.k} premières rangées"
 
     def code_machine(self) -> Dict[str, Any]:
-        return {"type": self.type_contrainte().value, "eleve": self.eleve.nom(), "k": self.k}
+        return {"type": self.type_contrainte().value, "eleve": self.eleve.nom, "k": self.k}
 
     def regles_asp(self, ctx: ASPContext) -> list[str]:
         s = ctx.id_par_eleve[self.eleve]
@@ -75,7 +75,7 @@ class DoitEtreDansDernieresRangees(Contrainte):
         return f"{self.eleve.affichage_nom()} doit être dans les {self.k} dernières rangées"
 
     def code_machine(self) -> Dict[str, Any]:
-        return {"type": self.type_contrainte().value, "eleve": self.eleve.nom(), "k": self.k}
+        return {"type": self.type_contrainte().value, "eleve": self.eleve.nom, "k": self.k}
 
     def regles_asp(self, ctx: ASPContext) -> list[str]:
         s = ctx.id_par_eleve[self.eleve]
@@ -110,7 +110,7 @@ class DoitEtreSeulALaTable(Contrainte):
         return f"{self.eleve.affichage_nom()} doit être seul à sa table"
 
     def code_machine(self) -> Dict[str, Any]:
-        return {"type": self.type_contrainte().value, "eleve": self.eleve.nom()}
+        return {"type": self.type_contrainte().value, "eleve": self.eleve.nom}
 
     def regles_asp(self, ctx: ASPContext) -> list[str]:
         s = ctx.id_par_eleve[self.eleve]
@@ -140,7 +140,7 @@ class DoitAvoirVoisinVide(Contrainte):
         return f"{self.eleve.affichage_nom()} doit avoir au moins un siège vide à côté"
 
     def code_machine(self) -> Dict[str, Any]:
-        return {"type": self.type_contrainte().value, "eleve": self.eleve.nom()}
+        return {"type": self.type_contrainte().value, "eleve": self.eleve.nom}
 
     def regles_asp(self, ctx: ASPContext) -> Sequence[str]:
         s = ctx.sid(self.eleve)
@@ -177,7 +177,7 @@ class DoitEtreExactementIci(Contrainte):
     def code_machine(self) -> Dict[str, Any]:
         return {
             "type": self.type_contrainte().value,
-            "eleve": self.eleve.nom(),
+            "eleve": self.eleve.nom,
             "x": self.ou.x,
             "y": self.ou.y,
             "seat": self.ou.siege,

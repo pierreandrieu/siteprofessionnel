@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from plandeclasse.modele.position import Position
-from plandeclasse.modele.table import Table
 from plandeclasse.modele.salle import Salle
 
 

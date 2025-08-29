@@ -41,17 +41,30 @@ class Eleve:
         self._prenom: str = " ".join(mots[i:])
         self._affichage_nom: str = nom_epure
 
+    @property
     def nom(self) -> str:
-        """Retourne le nom complet saisi."""
+        """Nom complet saisi (ex. 'DUPONT Alice')."""
         return self._nom
 
+    @property
     def nom_famille(self) -> str:
-        """Retourne la partie détectée comme nom de famille."""
+        """Partie détectée comme nom de famille (majuscules initiales)."""
         return self._nom_famille
 
+    @property
     def prenom(self) -> str:
-        """Retourne la partie détectée comme prénom."""
+        """Partie détectée comme prénom."""
         return self._prenom
+
+    @property
+    def genre(self) -> str:
+        """Genre saisi (ex. 'F' / 'M')."""
+        return self._genre
+
+    @property
+    def position(self) -> Optional[Position]:
+        """Position actuelle, ou `None` si non placé (modifiable)."""
+        return self._position
 
     def affichage_nom(self) -> str:
         """Retourne la chaîne à afficher pour cet élève."""
@@ -60,14 +73,6 @@ class Eleve:
     def definir_affichage_nom(self, nouveau: str) -> None:
         """Modifie la chaîne d'affichage pour cet élève."""
         self._affichage_nom = nouveau
-
-    def genre(self) -> str:
-        """Retourne le genre de l'élève."""
-        return self._genre
-
-    def position(self) -> Optional[Position]:
-        """Retourne la position actuelle ou `None` si non placé."""
-        return self._position
 
     def definir_position(self, position: Optional[Position]) -> None:
         """Affecte une position (ou `None` pour libérer)."""
@@ -101,6 +106,6 @@ class Eleve:
 
     def __lt__(self, autre: "Eleve") -> bool:
         # Tri : nom de famille puis prénom
-        if self.nom_famille() != autre.nom_famille():
-            return self.nom_famille() < autre.nom_famille()
-        return self.prenom() < autre.prenom()
+        if self.nom_famille != autre.nom_famille:
+            return self.nom_famille < autre.nom_famille
+        return self.prenom < autre.prenom

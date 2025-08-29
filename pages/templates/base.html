@@ -25,6 +25,7 @@
             <ul class="navbar-nav ms-auto">
                 <li class="nav-item"><a class="nav-link" href="{% url 'pages:home' %}">Accueil</a></li>
                 <li class="nav-item"><a class="nav-link" href="{% url 'cours:index' %}">Cours</a></li>
+                <li class="nav-item"><a class="nav-link" href="{% url 'plandeclasse:index' %}">Plan de classe</a></li>
                 <li class="nav-item"><a class="nav-link" href="{% url 'pages:about' %}">À propos</a></li>
                 <li class="nav-item"><a class="nav-link" href="{% url 'pages:privacy' %}">Vie privée</a></li>
                 <li class="nav-item"><a class="nav-link" href="{% url 'pages:initiatives' %}">Initiatives numériques européennes</a></li>
@@ -46,5 +47,7 @@
 
 <!-- Bootstrap JS bundle -->
 <script src="{% static 'vendor/bootstrap/5.3.7/js/bootstrap.bundle.min.js' %}" defer></script>
+
+{% block extra_js %}{% endblock %}
 </body>
 </html>

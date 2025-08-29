@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Iterable, List
+from typing import List
 
 from .position import Position
 from .table import Table
@@ -125,6 +124,6 @@ class Salle:
             lignes.setdefault(t.y, []).append(t)
         parts: List[str] = []
         for y in sorted(lignes):
-            ligne = " | ".join(f"({t.x},{t.y})x{t.capacite()}" for t in sorted(lignes[y], key=lambda t: t.x))
+            ligne = " | ".join(f"({t.x},{t.y})x{t.capacite()}" for t in sorted(lignes[y], key=lambda t_2: t_2.x))
             parts.append(ligne)
         return "\n".join(parts)

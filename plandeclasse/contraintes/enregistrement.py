@@ -16,7 +16,7 @@ from .binaires import (
     DoiventEtreSurMemeTable,
     DoiventEtreAdjacents,
 )
-from .structurelles import TableDoitEtreVide
+from .structurelles import TableDoitEtreVide, SiegeDoitEtreVide
 from ..modele.position import Position
 
 
@@ -28,7 +28,7 @@ def _fab_premieres_rangees(code: Mapping[str, Any], ctx: ContexteFabrique):
 
 
 @enregistrer(TypeContrainte.DERNIERES_RANGEES)
-def _fab_dernières_rangees(code: Mapping[str, Any], ctx: ContexteFabrique):
+def _fab_dernieres_rangees(code: Mapping[str, Any], ctx: ContexteFabrique):
     nom: str = str(code["eleve"])
     k: int = int(code["k"])
     return DoitEtreDansDernieresRangees(eleve=ctx.index_eleves_par_nom[nom], k=k, salle=ctx.salle)
@@ -82,3 +82,18 @@ def _fab_table_interdite(code: Mapping[str, Any], ctx: ContexteFabrique):
     x: int = int(code["x"])
     y: int = int(code["y"])
     return TableDoitEtreVide(x=x, y=y)
+
+
+@enregistrer(TypeContrainte.TABLE_INTERDITE)
+def _fab_table_interdite(code, ctx):
+    x: int = int(code["x"])
+    y: int = int(code["y"])
+    return TableDoitEtreVide(x=x, y=y)
+
+
+@enregistrer(TypeContrainte.SIEGE_INTERDIT)
+def _fab_siege_interdit(code, ctx):
+    x: int = int(code["x"])
+    y: int = int(code["y"])
+    seat: int = int(code["seat"])
+    return SiegeDoitEtreVide(x=x, y=y, seat=seat)

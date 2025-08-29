@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from plandeclasse.modele.salle import Salle
 from plandeclasse.modele.position import Position
 from plandeclasse.modele.eleve import Eleve
 from plandeclasse.contraintes.binaires import (

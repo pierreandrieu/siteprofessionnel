@@ -23,3 +23,4 @@ class TypeContrainte(str, Enum):
 
     # Structurelles (salle/table)
     TABLE_INTERDITE = "forbid_table"
+    SIEGE_INTERDIT = "forbid_seat"

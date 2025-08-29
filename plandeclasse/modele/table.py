@@ -43,13 +43,6 @@ class Table:
         """
         return self._y
 
-    def capacite(self) -> int:
-        """
-        nombre total de sièges de cette table.
-        alias pratique de get_capacite() basé sur la longueur de _places.
-        """
-        return len(self._places)
-
     def position_xy(self) -> tuple[int, int]:
         """Retourne la paire (x, y) de la table."""
         return self._x, self._y

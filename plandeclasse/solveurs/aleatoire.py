@@ -66,7 +66,7 @@ class SolveurAleatoireRetourArriere(Solveur):
             domaines[e] = domaine
 
         # Ordre des élèves : MRV puis nom pour la stabilité
-        ordre: List[Eleve] = sorted(eleves, key=lambda el: (len(domaines[el]), el.nom()))
+        ordre: List[Eleve] = sorted(eleves, key=lambda el: (len(domaines[el]), el.nom))
 
         essais: int = 0
         verifications: int = 0

@@ -34,7 +34,7 @@ class DoiventEtreEloignes(Contrainte):
         return f"{self.a.affichage_nom()} et {self.b.affichage_nom()} doivent être éloignés d'au moins {self.d}"
 
     def code_machine(self) -> Dict[str, Any]:
-        return {"type": self.type_contrainte().value, "a": self.a.nom(), "b": self.b.nom(), "d": self.d}
+        return {"type": self.type_contrainte().value, "a": self.a.nom, "b": self.b.nom, "d": self.d}
 
     def regles_asp(self, ctx: ASPContext) -> list[str]:
         a, b = ctx.sid(self.a), ctx.sid(self.b)
@@ -66,7 +66,7 @@ class DoiventEtreSurMemeTable(Contrainte):
         return f"{self.a.affichage_nom()} et {self.b.affichage_nom()} doivent être sur la même table"
 
     def code_machine(self) -> Dict[str, Any]:
-        return {"type": self.type_contrainte().value, "a": self.a.nom(), "b": self.b.nom()}
+        return {"type": self.type_contrainte().value, "a": self.a.nom, "b": self.b.nom}
 
     def regles_asp(self, ctx: ASPContext) -> Sequence[str]:
         a, b = ctx.sid(self.a), ctx.sid(self.b)
@@ -100,7 +100,7 @@ class DoiventEtreAdjacents(Contrainte):
         return f"{self.a.affichage_nom()} et {self.b.affichage_nom()} doivent être adjacents à la même table"
 
     def code_machine(self) -> Dict[str, Any]:
-        return {"type": self.type_contrainte().value, "a": self.a.nom(), "b": self.b.nom()}
+        return {"type": self.type_contrainte().value, "a": self.a.nom, "b": self.b.nom}
 
     def regles_asp(self, ctx: ASPContext) -> Sequence[str]:
         a, b = ctx.sid(self.a), ctx.sid(self.b)
