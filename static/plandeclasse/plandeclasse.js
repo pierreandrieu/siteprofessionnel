@@ -643,15 +643,17 @@ function onConstraintTypeChange() {
 
     if (needsK) {
         pLabel.textContent = "k (nombre de rangées)";
-        pInput.placeholder = "k";
+        //pInput.placeholder = "1";
+        pInput.value = 1
         pInput.min = "1";
         pHelp.textContent = "";
     } else if (needsD) {
         const maxD = computeMaxManhattan(state.schema);
         pLabel.textContent = "distance d (Manhattan)";
-        pInput.placeholder = "d";
-        pInput.min = "1";
-        pInput.max = String(Math.max(1, maxD));
+        //pInput.placeholder = "d";
+        pInput.value=2
+        pInput.min = "2";
+        pInput.max = String(Math.max(2, maxD));
         pHelp.textContent = maxD > 0 ? `valeur ≤ ${maxD} selon la salle` : "";
     } else {
         pLabel.textContent = "paramètre";
@@ -748,6 +750,12 @@ function renderConstraints() {
 /* ========= INIT ========= */
 function init() {
     // Attach one delegated click listener on the SVG
+
+    document.getElementById("toggleStudentsPanel")?.addEventListener("click", () => {
+        document.body.classList.toggle("students-hidden");
+        // Recalcule le SVG (viewport) une fois la colonne masquée/affichée
+        renderRoom();
+    });
     const canvas = document.getElementById("roomCanvas");
     if (canvas) canvas.addEventListener("click", onCanvasClick);
 

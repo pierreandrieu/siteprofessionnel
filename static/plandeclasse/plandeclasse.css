@@ -1,127 +1,71 @@
-/* === plan de classe — styles === */
-#pc-root {
-    padding-left: .25rem;
-    padding-right: .25rem;
+/* Container wide */
+#pc-root.container-fluid {
+    max-width: 100%;
 }
 
+/* Salle : occupe mieux la hauteur */
 .room-scroll {
-    height: 78vh;
-    overflow: auto;
-    background: #fff;
-    border: 1px solid #e5e7eb;
-    border-radius: .6rem;
-    padding: .25rem;
+    height: calc(100vh - 280px);
 }
 
-/* board */
-.board-rect {
-    fill: #1f2937;
-    stroke: #111827;
-    stroke-width: 1.5;
-    rx: 6px;
+/* ajuste si besoin */
+
+/* Colonne élèves : compacte + étroite en desktop */
+.students-panel {
+    min-width: 280px;
 }
 
-.board-label {
-    fill: #cbd5e1;
-    font-weight: 600;
-    letter-spacing: .02em;
-    font-size: 12px;
+@media (min-width: 1200px) {
+    /* xl */
+    .students-panel {
+        max-width: 360px;
+    }
 }
 
-/* tables + seats */
-.table-rect {
-    fill: #f1f3f5;
-    stroke: #cfd4da;
-}
-
-.seat-cell {
-    cursor: pointer;
-}
-
-.seat-free {
-    fill: rgba(0, 0, 0, 0);
-}
-
-.seat-occupied {
-    fill: rgba(11, 87, 208, .12);
-}
-
-/* stronger visual for forbidden seats */
-.seat-forbidden {
-    stroke: #9aa4b2 !important;
-    stroke-width: 10px; /* << épaisseur de bordure visible */
-    stroke-dasharray: 7 3;
-    fill: url(#forbidPattern) !important; /* << au cas où l'attribut fill serait absent */
-}
-/* vertical separators between seats */
-.seat-divider {
-    fill: #e2e8f0;
-    opacity: 0.9;
-}
-
-.seat-forbidden-cross {
-    stroke: #9aa4b2;
-    stroke-width: 1.5;
-    stroke-linecap: round;
-    opacity: .9;
-}
-
-.seat-selected {
-    stroke: #ffc107 !important;
-    stroke-width: 3;
-}
-
-.seat-name {
-    fill: #212529;
-    dominant-baseline: middle;
-    font-weight: 600;
-    white-space: pre-line; /* supports first\nlast */
-}
-
-/* students */
-.students-scroll {
-    max-height: 70vh;
-    overflow: auto;
-}
-
-.student {
+/* Corps de la carte élèves collant à la hauteur */
+.students-body {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: .5rem;
-    padding: .35rem .5rem;
-    border: 1px solid #e9ecef;
-    border-radius: .5rem;
-    background: var(--bs-body-bg);
-    cursor: pointer;
-    user-select: none;
+    flex-direction: column;
+    height: 100%;
 }
 
-.student:hover {
-    background: #f8f9fa;
+.students-body .students-scroll {
+    max-height: 32vh;
 }
 
-.student.selected {
-    outline: 2px solid #0b57d0;
+/* 2 listes visibles mais compactes */
+@media (min-width: 1200px) {
+    .students-body .students-scroll {
+        max-height: 35vh;
+    }
 }
 
-.student-name {
-    font-weight: 600;
-    font-size: .95rem;
-    line-height: 1.05;
+/* Version compacte des cartes élèves */
+.students-scroll.compact .student {
+    padding: .25rem .4rem;
+    border-radius: .4rem;
 }
 
-.student-sub {
-    font-size: .8rem;
-    color: #6c757d;
-    line-height: 1.05;
-}
-
-/* constraints */
-.constraint-pill {
+.students-scroll.compact .student-name {
     font-size: .9rem;
-    border: 1px solid #e9ecef;
-    border-radius: 999px;
-    padding: .25rem .5rem;
-    background: #f8fafc;
+}
+
+.students-scroll.compact .student-sub {
+    font-size: .75rem;
+}
+
+.students-scroll.compact .badge {
+    transform: scale(.9);
+    transform-origin: right center;
+}
+
+/* Bouton “↔” : discret */
+#toggleStudentsPanel {
+    line-height: 1;
+    padding: .2rem .45rem;
+}
+
+/* Quand panneau élèves masqué : la colonne prend 0 et la salle s’étend naturellement */
+.students-hidden .students-panel {
+    display: none !important;
 }
