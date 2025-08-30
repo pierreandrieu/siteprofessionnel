@@ -7,3 +7,7 @@ pytest
 pytest-django
 markdown
 clingo
+celery[redis]
+redis
+cairosvg
+django-redis
