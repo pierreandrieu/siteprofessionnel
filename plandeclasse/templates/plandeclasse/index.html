@@ -171,6 +171,35 @@
                             </div>
                         </div>
 
+                        <!-- ====== Export du plan (basé sur l'état courant) ====== -->
+                        <div class="export-block mt-3">
+                            <div class="row g-2 align-items-end">
+                                <div class="col-12 col-sm-6 col-md-4 col-lg-3">
+                                    <label for="className" class="form-label mb-1">Nom de la classe</label>
+                                    <input id="className" class="form-control form-control-sm"
+                                           placeholder="ex : 2nde 3">
+                                </div>
+
+                                <div class="col-12 col-sm-auto">
+                                    <label class="form-label invisible d-none d-sm-block">actions</label>
+                                    <button id="btnExport" type="button" class="btn btn-outline-primary">
+                                        exporter le plan (PNG, PDF, JSON)
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Liens d’export, remplis après génération -->
+                            <div id="exportDownloads" class="mt-2 d-none d-flex justify-content-center gap-2 flex-wrap">
+                                <a id="exPNG" class="btn btn-sm btn-outline-secondary" href="#" target="_blank">PNG</a>
+                                <a id="exPDF" class="btn btn-sm btn-outline-secondary" href="#" target="_blank">PDF</a>
+                                <a id="exSVG" class="btn btn-sm btn-outline-secondary" href="#" target="_blank">SVG</a>
+                                <a id="exJSON" class="btn btn-sm btn-outline-secondary" href="#" download>JSON</a>
+                                <a id="exZIP" class="btn btn-sm btn-outline-secondary" href="#" target="_blank">tout
+                                    (.zip)</a>
+                            </div>
+                        </div>
+
+
                     </div>
                 </div>
             </div>
@@ -231,14 +260,6 @@
                                 générer le plan de classe avec les contraintes ci-dessous
                             </button>
                             <div id="solveStatus" class="small text-muted"></div>
-                        </div>
-
-                        <!-- Liens de téléchargement (restent proches du bouton) -->
-                        <div id="solveDownloads" class="mt-2 d-none">
-                            <a id="dlPNG" class="btn btn-sm btn-outline-secondary" href="#" target="_blank">PNG</a>
-                            <a id="dlPDF" class="btn btn-sm btn-outline-secondary" href="#" target="_blank">PDF</a>
-                            <a id="dlSVG" class="btn btn-sm btn-outline-secondary" href="#" target="_blank">SVG</a>
-                            <a id="dlTXT" class="btn btn-sm btn-outline-secondary" href="#" target="_blank">contraintes.txt</a>
                         </div>
                     </div>
 

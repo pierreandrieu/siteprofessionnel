@@ -20,6 +20,8 @@ import {
 import {seatClick, onCanvasClick, toggleSelectedSeatBan, unassignSelected} from "./interactions.js";
 import {applySchema} from "./schema.js";
 import {startSolve} from "./solver.js";
+import {startExport} from "./export.js";
+
 
 function init() {
     // Solve
@@ -110,6 +112,10 @@ function init() {
     $("#constraintType")?.addEventListener("change", onConstraintTypeChange);
     $("#btnAddConstraint")?.addEventListener("click", addConstraint);
     $("#btnCancelConstraint")?.addEventListener("click", cancelConstraintForm);
+
+    // téléchargement des données
+    document.getElementById("btnExport")?.addEventListener("click", startExport);
+
 
     // Rendus initiaux
     renderRoom();

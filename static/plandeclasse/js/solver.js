@@ -30,16 +30,20 @@ export function buildSolvePayload() {
 let _pollTimer /**: number|null */ = null;
 
 export async function startSolve() {
-    const btn = document.getElementById("btnSolve");
-    const statusEl = document.getElementById("solveStatus");
-    const dl = document.getElementById("solveDownloads");
-    const dlPNG = document.getElementById("dlPNG");
-    const dlPDF = document.getElementById("dlPDF");
-    const dlSVG = document.getElementById("dlSVG");
-    const dlTXT = document.getElementById("dlTXT");
+    // -- Récupération tolérante des éléments UI (peuvent ne pas exister)
+    const btn = /** @type {HTMLButtonElement|null} */ (document.getElementById("btnSolve"));
+    const statusEl = /** @type {HTMLElement|null} */        (document.getElementById("solveStatus"));
 
-    statusEl.textContent = "envoi...";
-    dl.classList.add("d-none");
+    // Bloc "anciens" téléchargements (peut être absent selon ton HTML actuel)
+    const dl = /** @type {HTMLElement|null} */           (document.getElementById("solveDownloads"));
+    const dlPNG = /** @type {HTMLAnchorElement|null} */     (document.getElementById("dlPNG"));
+    const dlPDF = /** @type {HTMLAnchorElement|null} */     (document.getElementById("dlPDF"));
+    const dlSVG = /** @type {HTMLAnchorElement|null} */     (document.getElementById("dlSVG"));
+    const dlTXT = /** @type {HTMLAnchorElement|null} */     (document.getElementById("dlTXT"));
+
+    // -- UI : état initial
+    if (statusEl) statusEl.textContent = "envoi...";
+    dl?.classList.add("d-none"); // n'agit que si le bloc existe
     if (_pollTimer) {
         clearInterval(_pollTimer);
         _pollTimer = null;
@@ -55,42 +59,48 @@ export async function startSolve() {
         });
         if (!r.ok) throw new Error("start failed");
         const {task_id} = await r.json();
-        statusEl.textContent = "calcul en cours…";
-        btn.disabled = true;
+        if (statusEl) statusEl.textContent = "calcul en cours…";
+        if (btn) btn.disabled = true;
 
+        // -- Polling
         _pollTimer = setInterval(async () => {
             try {
                 const rr = await fetch(`/plandeclasse/solve/status/${task_id}`);
                 const data = await rr.json();
+
                 if (data.status && ["PENDING", "RECEIVED", "STARTED", "RETRY"].includes(data.status)) {
-                    return;
+                    return; // encore en cours
                 }
+
                 clearInterval(_pollTimer);
                 _pollTimer = null;
-                btn.disabled = false;
+                if (btn) btn.disabled = false;
 
                 if (data.status === "SUCCESS") {
+                    // 1) appliquer l’affectation renvoyée par le solveur
                     applyAssignment(data.assignment || {});
-                    if (data.download) {
-                        dlPNG.href = data.download.png;
-                        dlPDF.href = data.download.pdf;
-                        dlSVG.href = data.download.svg;
-                        dlTXT.href = data.download.txt;
+
+                    // 2) afficher les liens de téléchargement si le bloc est présent
+                    if (data.download && dl) {
+                        if (dlPNG && data.download.png) dlPNG.href = data.download.png;
+                        if (dlPDF && data.download.pdf) dlPDF.href = data.download.pdf;
+                        if (dlSVG && data.download.svg) dlSVG.href = data.download.svg;
+                        if (dlTXT && data.download.txt) dlTXT.href = data.download.txt;
                         dl.classList.remove("d-none");
                     }
-                    statusEl.textContent = "terminé ✔";
+                    if (statusEl) statusEl.textContent = "terminé ✔";
                 } else {
-                    statusEl.textContent = `échec : ${data.error || "aucune solution"}`;
+                    if (statusEl) statusEl.textContent = `échec : ${data.error || "aucune solution"}`;
                 }
             } catch (_e) {
                 clearInterval(_pollTimer);
                 _pollTimer = null;
-                btn.disabled = false;
-                statusEl.textContent = "erreur de polling";
+                if (btn) btn.disabled = false;
+                if (statusEl) statusEl.textContent = "erreur de polling";
             }
         }, 1000);
     } catch (_e) {
-        statusEl.textContent = "erreur d’envoi";
+        if (statusEl) statusEl.textContent = "erreur d’envoi";
     }
 }
 
