@@ -1,0 +1,240 @@
+/* ==========================================================================
+   Plan de classe – styles de la page (SVG + listes d’élèves)
+   ========================================================================== */
+
+/* ------------------------- Layout conteneur ------------------------------ */
+#pc-root.container-fluid {
+    max-width: 100%;
+}
+
+#pc-root {
+    padding-left: .25rem;
+    padding-right: .25rem;
+}
+
+/* ------------------------- Room (SVG) ------------------------------------ */
+/* Hauteur adaptée à la page découpée en 3 cartes (CSV / élèves / salle).
+   Ajuste 340px si ta navbar/footer diffèrent. */
+.room-scroll {
+    height: calc(100vh - 340px);
+    overflow: auto;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: .6rem;
+    padding: .25rem;
+}
+
+.board-rect {
+    fill: #1f2937;
+    stroke: #111827;
+    stroke-width: 1.5;
+    rx: 6px;
+}
+
+.board-label {
+    fill: #cbd5e1;
+    font-weight: 600;
+    letter-spacing: .02em;
+    font-size: 12px;
+}
+
+.table-rect {
+    fill: #f1f3f5;
+    stroke: #cfd4da;
+}
+
+.seat-cell {
+    cursor: pointer;
+}
+
+.seat-free {
+    fill: rgba(255, 255, 255, 0.6);
+}
+
+.seat-occupied {
+    fill: rgba(11, 87, 208, 0.12);
+}
+
+.seat-selected {
+    stroke: #ffc107 !important;
+    stroke-width: 3;
+}
+
+.seat-name {
+    fill: #212529;
+    dominant-baseline: middle;
+    font-weight: 600;
+    white-space: pre-line;
+}
+
+/* ------------------------- Carte “Liste des élèves” ---------------------- */
+/* Masquer toute la carte des élèves via le toggle JS (#pc-root.students-hidden) */
+#pc-root.students-hidden .students-card {
+    display: none !important;
+}
+
+/* Bloc interne avec deux lignes horizontales (placés / non placés) */
+.students-strip {
+    border: 1px solid #e5e7eb;
+    border-radius: .6rem;
+    background: #fafbfc;
+    padding: .5rem .5rem .75rem;
+}
+
+.students-strip-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+    margin-bottom: .25rem;
+}
+
+.students-strip-section + .students-strip-section {
+    border-top: 1px solid #e5e7eb;
+}
+
+/* Titres de rangée */
+.students-strip-title {
+    font-size: .95rem;
+    font-weight: 600;
+    color: #6b7280;
+}
+
+/* Scroller horizontal pour les “chips” d’élèves */
+.students-scroll.horizontal {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    gap: .5rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+    scrollbar-width: thin;
+    padding: .25rem 0;
+    min-height: 46px;
+    border: 1px dashed transparent; /* helper discrète */
+}
+
+/* “Chip” élève */
+.student {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+    padding: .35rem .6rem;
+    border: 1px solid #e9ecef;
+    border-radius: .5rem;
+    background: var(--bs-body-bg);
+    cursor: pointer;
+    user-select: none;
+    min-width: 140px;
+    max-width: 220px;
+    white-space: normal; /* autorise 2 lignes */
+}
+
+.student:hover {
+    background: #f8f9fa;
+}
+
+.student.selected {
+    outline: 2px solid #0b57d0;
+}
+
+/* Texte des élèves — versions “standard” (agrandi) */
+.student-name {
+    font-weight: 600;
+    font-size: 1.05rem;
+    line-height: 1.1;
+}
+
+.student-sub {
+    font-size: .9rem;
+    color: #6c757d;
+    line-height: 1.05;
+}
+
+/* Variante compacte quand beaucoup d’items */
+.students-scroll.compact .student {
+    padding: .25rem .45rem;
+    border-radius: .45rem;
+}
+
+.students-scroll.compact .student-name {
+    font-size: .98rem;
+}
+
+.students-scroll.compact .student-sub {
+    font-size: .8rem;
+}
+
+/* Bouton de toggle compact */
+#toggleStudentsPanel {
+    line-height: 1;
+    padding: .2rem .45rem;
+}
+
+/* ------------------------- “Constraint pills” ---------------------------- */
+.constraint-pill {
+    font-size: .9rem;
+    border: 1px solid #e9ecef;
+    border-radius: 999px;
+    padding: .25rem .5rem;
+    background: #f8fafc;
+}
+
+/* ------------------------- Impression ----------------------------------- */
+@media print {
+    .students-strip {
+        background: #fff;
+        border-color: #ddd;
+    }
+
+    .student.selected {
+        outline-color: #333;
+    }
+
+    .seat-occupied {
+        fill: rgba(0, 0, 0, 0.06);
+    }
+}
+
+/* Champ numérique des paramètres — version compacte
+   - max-width borne la largeur visuelle
+   - w-auto (Bootstrap) casse le width:100% de .form-control
+*/
+.param-input {
+    max-width: 120px; /* ajuste à 100–140px selon ton goût */
+}
+
+/* Sur tout petit écran, on repasse en pleine largeur pour l’accessibilité */
+@media (max-width: 576px) {
+    .param-input {
+        max-width: 100%;
+    }
+}
+
+/* Le texte d’aide sous le champ (id=cstParamHelp) peut être un peu resserré */
+#cstParamHelp {
+    margin-top: .25rem;
+}
+
+/* Sélecteurs élèves (contraintes)  */
+.cst-select {
+    font-size: .95rem;
+    padding: .30rem .60rem;
+    border-radius: .3rem;
+}
+
+@media (min-width: 768px) {
+    .cst-select {
+        max-width: 280px;
+    }
+
+}
+
+.pc-help {
+    border: 1px solid #e5e7eb;
+    border-radius: .5rem;
+    background: #fff;
+    padding: .5rem .75rem;
+}

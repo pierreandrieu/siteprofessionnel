@@ -27,8 +27,10 @@ function init() {
 
     // Colonne élèves (toggle)
     document.getElementById("toggleStudentsPanel")?.addEventListener("click", () => {
-        document.body.classList.toggle("students-hidden");
-        renderRoom(); // recalcul viewport
+        // On applique la classe sur #pc-root pour que le CSS puisse masquer la carte complète
+        document.getElementById("pc-root")?.classList.toggle("students-hidden");
+        // Recalcule le SVG après changement de layout
+        renderRoom();
     });
 
     // Canvas SVG (délégué)

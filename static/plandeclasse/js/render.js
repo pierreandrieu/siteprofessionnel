@@ -292,12 +292,11 @@ export function renderStudents() {
         card.className = "student" + (state.selection.studentId === st.id ? " selected" : "");
         card.dataset.sid = String(st.id);
         card.innerHTML = `
-      <div class="d-flex flex-column">
-        <span class="student-name">${st.first}</span>
-        <span class="student-sub">${st.last}</span>
-      </div>
-      <span class="badge text-bg-light">${state.placedByStudent.has(st.id) ? "placé" : "libre"}</span>
-    `;
+  <div class="d-flex flex-column">
+    <span class="student-name">${st.first}</span>
+    <span class="student-sub">${st.last}</span>
+  </div>
+`;
         card.addEventListener("click", () => {
             if (state.selection.studentId === st.id) {
                 state.selection.studentId = null;

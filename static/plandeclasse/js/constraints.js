@@ -52,7 +52,7 @@ export function onConstraintTypeChange() {
         pInput.value = "2";
         pInput.min = "2";
         pInput.max = String(Math.max(2, maxD));
-        pHelp.textContent = maxD > 0 ? `valeur ≤ ${maxD} selon la salle` : "";
+        pHelp.textContent = maxD > 0 ? `valeur ≤ ${maxD} pour cette salle` : "";
     } else {
         pLabel.textContent = "paramètre";
         pInput.placeholder = "";
