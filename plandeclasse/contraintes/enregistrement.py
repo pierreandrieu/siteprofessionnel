@@ -84,15 +84,8 @@ def _fab_table_interdite(code: Mapping[str, Any], ctx: ContexteFabrique):
     return TableDoitEtreVide(x=x, y=y)
 
 
-@enregistrer(TypeContrainte.TABLE_INTERDITE)
-def _fab_table_interdite(code, ctx):
-    x: int = int(code["x"])
-    y: int = int(code["y"])
-    return TableDoitEtreVide(x=x, y=y)
-
-
 @enregistrer(TypeContrainte.SIEGE_INTERDIT)
-def _fab_siege_interdit(code, ctx):
+def _fab_siege_interdit(code: Mapping[str, Any], ctx):
     x: int = int(code["x"])
     y: int = int(code["y"])
     seat: int = int(code["seat"])

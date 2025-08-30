@@ -121,22 +121,95 @@ function updateBanButtonLabel() {
 }
 
 /* ========= CSV ========= */
+
+/** Détecte le genre dans une cellule CSV, quels que soient les artefacts HTML. */
+function extractGender(cell) {
+    const raw = String(cell || "").trim();
+    const lower = raw.toLowerCase();
+
+    // Nouvel export Pronote : balises <i class="... icon_venus|icon_mars ...">
+    if (lower.includes("icon_venus")) return "F";
+    if (lower.includes("icon_mars")) return "M";
+
+    // Nettoyage HTML générique
+    const noTags = lower.replace(/<[^>]+>/g, "").replace(/"/g, "").trim();
+
+    // Ancien export : lettres ou mots (fr/en)
+    if (/^f(é|minin|emale)?$/.test(noTags)) return "F";   // f, féminin, female
+    if (/^g$/.test(noTags)) return "M";                   // g = garçon
+    if (/^m(asculin|ale)?$/.test(noTags)) return "M";     // m, masculin, male
+
+    return null;
+}
+
+/**
+ * Parseur CSV tolérant :
+ * - Détecte le séparateur (',' ou ';').
+ * - Repère la colonne "nom" par header, sinon 1ère colonne.
+ * - Repère la colonne "genre" par header si possible, sinon heuristique
+ *   en scannant les 5 premières lignes pour trouver la colonne contenant
+ *   icon_venus/icon_mars ou des valeurs F/G/M/Féminin/…
+ */
 function parseCSV(text) {
     const lines = text.split(/\r?\n/).filter((l) => l.trim() !== "");
     if (!lines.length) return [];
+
+    // Détection séparateur simple
     const sep = lines[0].includes(";") ? ";" : ",";
+
+    // En-têtes
     const header = lines[0].split(sep).map((h) => h.trim().toLowerCase());
+
+    // Colonne "nom"
     let idxName = header.findIndex((h) => ["nom", "élève", "eleve", "name"].includes(h));
     if (idxName === -1) idxName = 0;
 
+    // Colonne "genre" par header s’il existe
+    let idxGender = header.findIndex((h) => ["sexe", "genre", "gender"].includes(h));
+
+    // Heuristique : si pas de colonne genre nommée,
+    // tenter de la deviner en scannant les premières lignes
+    if (idxGender === -1 && lines.length > 1) {
+        const maxProbe = Math.min(6, lines.length); // header + 5 lignes
+        const scores = new Array(header.length).fill(0);
+        for (let i = 1; i < maxProbe; i++) {
+            const cols = lines[i].split(sep);
+            for (let c = 0; c < cols.length; c++) {
+                const g = extractGender(cols[c]);
+                if (g === "F" || g === "M") scores[c] += 1;
+            }
+        }
+        // Choisir la colonne avec le meilleur score si > 0
+        let best = -1, bestScore = 0;
+        for (let c = 0; c < scores.length; c++) {
+            if (scores[c] > bestScore) {
+                best = c;
+                bestScore = scores[c];
+            }
+        }
+        if (bestScore > 0) idxGender = best;
+    }
+
+    // Parcours des lignes
     const rows = [];
     for (let i = 1; i < lines.length; i++) {
         const cols = lines[i].split(sep);
-        const raw = (cols[idxName] || "").replace(/<[^>]+>/g, "").replace(/"/g, "").trim();
-        if (raw) rows.push({name: raw, gender: null});
+
+        // Nom (on retire HTML éventuel)
+        const rawName = (cols[idxName] || "").replace(/<[^>]+>/g, "").replace(/"/g, "").trim();
+        if (!rawName) continue;
+
+        // Genre (si colonne identifiée)
+        let g = null;
+        if (idxGender !== -1 && idxGender < cols.length) {
+            g = extractGender(cols[idxGender]);
+        }
+
+        rows.push({name: rawName, gender: g});
     }
     return rows;
 }
+
 
 /* ========= SVG RENDERING ========= */
 
@@ -747,10 +820,116 @@ function renderConstraints() {
     }
 }
 
+function buildSolvePayload() {
+    return {
+        schema: state.schema,
+        students: state.students.map(s => ({
+            id: s.id,
+            name: s.name,          // ← important pour Eleve(nom=...) côté Python
+            first: s.first,
+            last: s.last,
+            gender: s.gender || null
+        })),
+        options: state.options,
+        constraints: state.constraints,              // déjà au bon format (type, a, b, k, d, ... + human)
+        forbidden: Array.from(state.forbidden),      // ["x,y,s", ...]
+        placements: Object.fromEntries(state.placements), // {"x,y,s": studentId}
+        name_view: state.nameView,
+    };
+}
+
+let _pollTimer = null;
+
+async function startSolve() {
+    const btn = document.getElementById("btnSolve");
+    const statusEl = document.getElementById("solveStatus");
+    const dl = document.getElementById("solveDownloads");
+    const dlPNG = document.getElementById("dlPNG");
+    const dlPDF = document.getElementById("dlPDF");
+    const dlSVG = document.getElementById("dlSVG");
+    const dlTXT = document.getElementById("dlTXT");
+
+    // UI reset
+    statusEl.textContent = "envoi...";
+    dl.classList.add("d-none");
+    if (_pollTimer) {
+        clearInterval(_pollTimer);
+        _pollTimer = null;
+    }
+
+    const body = JSON.stringify(buildSolvePayload());
+
+    try {
+        const r = await fetch("/plandeclasse/solve/start", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body
+        });
+        if (!r.ok) throw new Error("start failed");
+        const {task_id} = await r.json();
+        statusEl.textContent = "calcul en cours…";
+        btn.disabled = true;
+
+        // polling
+        _pollTimer = setInterval(async () => {
+            try {
+                const rr = await fetch(`/plandeclasse/solve/status/${task_id}`);
+                const data = await rr.json();
+                if (data.status && ["PENDING", "RECEIVED", "STARTED", "RETRY"].includes(data.status)) {
+                    // still running
+                    return;
+                }
+                clearInterval(_pollTimer);
+                _pollTimer = null;
+                btn.disabled = false;
+
+                if (data.status === "SUCCESS") {
+                    // 1) appliquer l’affectation renvoyée par le solveur
+                    applyAssignment(data.assignment || {});
+                    // 2) afficher les liens de téléchargement
+                    if (data.download) {
+                        dlPNG.href = data.download.png;
+                        dlPDF.href = data.download.pdf;
+                        dlSVG.href = data.download.svg;
+                        dlTXT.href = data.download.txt;
+                        dl.classList.remove("d-none");
+                    }
+                    statusEl.textContent = "terminé ✔";
+                } else {
+                    statusEl.textContent = `échec : ${data.error || "aucune solution"}`;
+                }
+            } catch (e) {
+                clearInterval(_pollTimer);
+                _pollTimer = null;
+                btn.disabled = false;
+                statusEl.textContent = "erreur de polling";
+            }
+        }, 1000);
+    } catch (e) {
+        statusEl.textContent = "erreur d’envoi";
+    }
+}
+
+function applyAssignment(assignmentObj) {
+    // assignmentObj : {"x,y,s": studentId, ...}
+    // on remet à zéro les placements puis on applique ce que renvoie le solveur
+    state.placements.clear();
+    state.placedByStudent.clear();
+    for (const [seatKey, sid] of Object.entries(assignmentObj)) {
+        state.placements.set(seatKey, Number(sid));
+        state.placedByStudent.set(Number(sid), seatKey);
+    }
+    // re-render
+    renderRoom();
+    renderStudents();
+    updateBanButtonLabel();
+}
+
+
 /* ========= INIT ========= */
 function init() {
     // Attach one delegated click listener on the SVG
-
+    document.getElementById("btnSolve")?.addEventListener("click", startSolve);
     document.getElementById("toggleStudentsPanel")?.addEventListener("click", () => {
         document.body.classList.toggle("students-hidden");
         // Recalcule le SVG (viewport) une fois la colonne masquée/affichée

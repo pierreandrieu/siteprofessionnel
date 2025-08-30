@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from django.views.decorators.http import require_POST, require_GET
+
+from .tasks import t_solve_plandeclasse
+
 import json
 import uuid
 from typing import Any, Dict
@@ -9,10 +13,11 @@ from django.http import (
     HttpResponse,
     JsonResponse,
     HttpResponseBadRequest,
-    HttpResponseNotAllowed,
+    HttpResponseNotAllowed, HttpResponseNotFound,
 )
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
+from django.core.cache import cache
 
 # -----------------------------------------------------------------------------
 # Stockage “mémoire” des demandes (DEV UNIQUEMENT).
@@ -106,3 +111,58 @@ def demande_statut(request: HttpRequest, demande_id: uuid.UUID) -> HttpResponse:
     if d.get("statut") == "terminee":
         reponse["resultat"] = d.get("resultat", {})
     return JsonResponse(reponse)
+
+
+@csrf_exempt
+@require_POST
+def solve_start(request):
+    """
+    Lance la tâche Celery. Le body est le JSON de la page (schema, students, options, constraints, etc.).
+    Retourne un task_id à poller.
+    """
+    import json
+    data = json.loads(request.body or "{}")
+    task = t_solve_plandeclasse.delay(data)
+    return JsonResponse({"task_id": task.id})
+
+
+@require_GET
+def solve_status(request, task_id: str):
+    """
+    Polling d’état : PENDING / STARTED / SUCCESS / FAILURE.
+    En cas de SUCCESS, renvoie aussi assignment + URLs de téléchargement.
+    """
+    from celery.result import AsyncResult
+    ar = AsyncResult(task_id)
+    if ar.state in ("PENDING", "RECEIVED", "STARTED", "RETRY"):
+        return JsonResponse({"status": ar.state})
+    if ar.state == "SUCCESS":
+        return JsonResponse(ar.result)
+    # FAILURE
+    err = ""
+    try:
+        err = str(ar.result)
+    except Exception:
+        pass
+    return JsonResponse({"status": "FAILURE", "error": err or "échec."}, status=200)
+
+
+@require_GET
+def download_artifact(request, token: str, fmt: str):
+    """
+    Sert un artefact éphémère depuis Redis (pas de disque, pas de DB).
+    fmt ∈ {svg, png, pdf, txt}
+    """
+    key = f"pc:{token}:{fmt}"
+    blob = cache.get(key)
+    if blob is None:
+        return HttpResponseNotFound("introuvable ou expiré")
+    if fmt == "svg":
+        return HttpResponse(blob, content_type="image/svg+xml")
+    if fmt == "png":
+        return HttpResponse(blob, content_type="image/png")
+    if fmt == "pdf":
+        return HttpResponse(blob, content_type="application/pdf")
+    if fmt == "txt":
+        return HttpResponse(blob, content_type="text/plain; charset=utf-8")
+    return HttpResponseNotFound("format invalide")

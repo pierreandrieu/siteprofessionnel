@@ -74,7 +74,7 @@ class SolveurClingo(Solveur):
             contraintes: Sequence[Contrainte],
             *,
             essais_max: int = 10_000,  # ignoré côté ASP (compat API)
-            budget_temps_ms: Optional[int] = None,  # limite mur en millisecondes
+            budget_temps_ms: Optional[int] = None  # limite mur en millisecondes
     ) -> ResultatResolution:
         """
         Construit et résout le programme ASP, puis reconstruit l’affectation.
@@ -82,14 +82,15 @@ class SolveurClingo(Solveur):
         Étapes :
         - vérifications rapides (sièges suffisants, collisions, incohérences),
         - construction des faits ASP (salle, élèves, contraintes, allow/4, objectifs),
-        - appel Clingo avec `--time-limit` si fourni,
+        - configuration de Clingo via l’API (pas d’arguments CLI),
+        - résolution asynchrone avec attente bornée et annulation en cas de dépassement,
         - lecture du premier modèle optimal et reconstruction Eleve -> Position,
         - validations finales locales dépendant des capacités de tables.
         """
-        # 1) Vérifications rapides pour économiser le temps de résolution
+        # 1) Vérifications rapides
         self._sanity_check(salle, eleves, contraintes)
 
-        # 2) Contexte d’identifiants pour les élèves
+        # 2) Contexte d’identifiants
         ctx: _ContexteASP = self._contexte(eleves)
 
         # 3) Programme ASP (squelette + faits)
@@ -103,31 +104,43 @@ class SolveurClingo(Solveur):
         ]
         prg_str: str = "\n".join(parts)
 
-        # 4) Configuration Clingo
-        args: List[str] = ["--opt-mode=optN"]
-        # Optionnel : un profil généralement performant
-        # args += ["--configuration=trendy"]
-        if budget_temps_ms and budget_temps_ms > 0:
-            # Clingo attend des secondes entières
-            args.append(f"--time-limit={int(budget_temps_ms // 1000)}")
-        ctl: clingo.Control = clingo.Control(args)
+        # 4) Configuration Clingo via l’API (aucun argument CLI)
+        ctl: clingo.Control = clingo.Control([])
+
+        # Nombre de modèles retournés
         ctl.configuration.solve.models = self.models
 
-        # 5) Charge et ground le programme (pas d’I/O fichiers)
+        # Mode d’optimisation équivalent à --opt-mode=optN si disponible
+        # (selon la version de libclingo, l’attribut peut ne pas exister)
+        try:
+            ctl.configuration.solve.opt_mode = "optN"
+        except Exception:
+            pass  # option absente : l’optimisation par défaut reste valable
+
+        # 5) Chargement et grounding du programme (sans I/O fichiers)
         ctl.add("base", [], prg_str)
         ctl.ground([("base", [])])
 
-        # 6) Résolution (capture du premier modèle optimal)
+        # 6) Résolution asynchrone (capture du premier modèle trouvé)
         modele_assign: Dict[int, Tuple[int, int, int]] = {}
 
         def on_model(m: clingo.Model) -> None:
+            # Capture uniquement le premier modèle (suffisant pour reconstruire)
             nonlocal modele_assign
-            if not modele_assign:  # capture uniquement le premier modèle
+            if not modele_assign:
                 modele_assign = self._lire_modele(m)
 
-        res: clingo.SolveResult = ctl.solve(on_model=on_model)
+        handle = ctl.solve(on_model=on_model, async_=True)
 
-        # 7) Gestion des cas sans solution
+        # Attente bornée si un budget temps est fourni ; annulation en cas de dépassement
+        if budget_temps_ms and budget_temps_ms > 0:
+            finished: bool = handle.wait(budget_temps_ms / 1000.0)
+            if not finished:
+                handle.cancel()
+
+        res: clingo.SolveResult = handle.get()
+
+        # 7) Cas sans solution
         if not res.satisfiable or not modele_assign:
             return ResultatResolution(affectation=None, essais=0, verifications=0)
 
@@ -137,7 +150,7 @@ class SolveurClingo(Solveur):
             e: Eleve = ctx.eleve_par_id[sid]
             affectation[e] = Position(x=x, y=y, siege=s)
 
-        # 9) Vérifications finales locales (ex : voisin vide)
+        # 9) Vérifications finales locales (ex. voisin vide)
         if not self.valider_final(salle, affectation, contraintes):
             return ResultatResolution(affectation=None, essais=0, verifications=0)
 
