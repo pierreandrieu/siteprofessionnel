@@ -1,12 +1,19 @@
-/* === styles globaux === */
+/* ==========================================================================
+   Styles généraux du site
+   - Chargé sur toutes les pages
+   ========================================================================== */
+
+/* Fond de page doux, compatible Bootstrap */
 body {
     background: #f8fafc;
 }
 
+/* Barre de navigation (couleur corporate) */
 .navbar {
     background: #0b57d0 !important;
 }
 
+/* Liens : style discret, soulignement au survol */
 a {
     text-decoration: none;
 }
@@ -15,21 +22,25 @@ a:hover {
     text-decoration: underline;
 }
 
-/* PDF viewer */
+/* ------------------------- PDF viewer ----------------------------------- */
+/* Conteneur scrollable pour iframe/pdf */
 .pdf-viewer {
     height: 70vh;
     overflow: auto;
     background: #f8f9fa;
 }
 
+/* Iframe PDF plein conteneur, sans bordure */
 .pdf-frame {
     width: 100%;
     height: 100%;
     border: 0;
 }
 
-/* Markdown minimal */
-.markdown-body h1, .markdown-body h2, .markdown-body h3 {
+/* ------------------------- Markdown léger ------------------------------- */
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3 {
     margin-top: 1.25rem;
 }
 
@@ -50,12 +61,14 @@ a:hover {
     width: 100%;
 }
 
-.markdown-body th, .markdown-body td {
+.markdown-body th,
+.markdown-body td {
     padding: .5rem;
     border-bottom: 1px solid #e9ecef;
 }
 
-/* Timeline */
+/* ------------------------- Timeline ------------------------------------- */
+/* Ligne verticale + puces pour énumérations temporelles */
 .timeline {
     border-left: 2px solid var(--bs-border-color);
     padding-left: 1rem;
@@ -78,7 +91,8 @@ a:hover {
     border: 2px solid var(--bs-border-color);
 }
 
-/* Divers */
+/* ------------------------- Petits composants UI ------------------------- */
+/* Étiquette compacte réutilisable */
 .pill {
     display: inline-block;
     padding: .25rem .6rem;
@@ -87,6 +101,7 @@ a:hover {
     font-size: .9rem;
 }
 
+/* Encadré informatif neutre (ton clair, bords arrondis) */
 .callout {
     background: var(--bs-body-bg);
     border: 1px solid var(--bs-border-color);
@@ -103,6 +118,7 @@ a:hover {
     margin-top: .35rem;
 }
 
+/* Séparateur titré (“—  Titre  —”) */
 .labeled-hr {
     display: grid;
     place-items: center;
@@ -111,7 +127,8 @@ a:hover {
     margin: 1.5rem 0 1rem;
 }
 
-.labeled-hr::before, .labeled-hr::after {
+.labeled-hr::before,
+.labeled-hr::after {
     content: "";
     height: 1px;
     width: 100%;
@@ -127,6 +144,7 @@ a:hover {
     background: var(--bs-body-bg);
 }
 
+/* Boutons “icône + libellé” alignés proprement */
 .icon-btn {
     display: inline-flex;
     align-items: center;
@@ -138,114 +156,4 @@ a:hover {
     height: 1.1rem !important;
     flex: 0 0 auto;
     fill: currentColor;
-}
-
-/* === plan de classe === */
-
-/* ===== plan de classe – ajustements ===== */
-#pc-root {
-    padding-left: .25rem;
-    padding-right: .25rem;
-}
-
-.room-scroll {
-    height: 78vh;
-    overflow: auto;
-    background: #fff;
-    border: 1px solid #e5e7eb;
-    border-radius: .6rem;
-    padding: .25rem;
-}
-
-/* tableau (“board”) */
-.board-rect {
-    fill: #1f2937;
-    stroke: #111827;
-    stroke-width: 1.5;
-    rx: 6px;
-}
-
-.board-label {
-    fill: #cbd5e1;
-    font-weight: 600;
-    letter-spacing: .02em;
-    font-size: 12px;
-}
-
-/* tables + sièges */
-.table-rect {
-    fill: #f1f3f5;
-    stroke: #cfd4da;
-}
-
-.seat-cell {
-    cursor: pointer;
-}
-
-.seat-free {
-    fill: rgba(0, 0, 0, 0);
-}
-
-.seat-occupied {
-    fill: rgba(11, 87, 208, 0.12);
-}
-
-.seat-selected {
-    stroke: #ffc107 !important;
-    stroke-width: 3;
-}
-
-.seat-name {
-    fill: #212529;
-    dominant-baseline: middle;
-    font-weight: 600;
-    white-space: pre-line; /* gère les deux lignes prénom\nnom */
-}
-
-/* élèves : texte plus petit */
-.students-scroll {
-    max-height: 70vh;
-    overflow: auto;
-}
-
-.student {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: .5rem;
-    padding: .35rem .5rem;
-    border: 1px solid #e9ecef;
-    border-radius: .5rem;
-    background: var(--bs-body-bg);
-    cursor: pointer;
-    user-select: none;
-}
-
-.student:hover {
-    background: #f8f9fa;
-}
-
-.student.selected {
-    outline: 2px solid #0b57d0;
-}
-
-.student-name {
-    font-weight: 600;
-    font-size: .95rem;
-    line-height: 1.05;
-}
-
-.student-sub {
-    font-size: .8rem;
-    color: #6c757d;
-    line-height: 1.05;
-}
-
-/* contraintes */
-.constraint-pill {
-    font-size: .9rem;
-    border: 1px solid #e9ecef;
-    border-radius: 999px;
-    padding: .25rem .5rem;
-    background: #f8fafc;
 }

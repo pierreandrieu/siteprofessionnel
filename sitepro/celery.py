@@ -6,6 +6,6 @@ os.environ.setdefault(
     os.environ.get("DJANGO_SETTINGS_MODULE", "sitepro.settings.dev")
 )
 
-app = Celery("sitepro")  # pas "proj"
+app = Celery("sitepro")
 app.config_from_object("django.conf:settings", namespace="CELERY")
 app.autodiscover_tasks()

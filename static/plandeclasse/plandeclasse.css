@@ -1,46 +1,152 @@
-/* Container wide */
+/* ==========================================================================
+   Plan de classe
+   - Styles strictement liés à l’interface de plan de classe (SVG + listes)
+   - Chargé uniquement sur la page correspondante
+   ========================================================================== */
+
+/* Conteneur plein écran utile sur cette page (container-fluid) */
 #pc-root.container-fluid {
     max-width: 100%;
 }
 
-/* Salle : occupe mieux la hauteur */
-.room-scroll {
-    height: calc(100vh - 280px);
+/* Marges internes légères autour du bloc plan de classe */
+#pc-root {
+    padding-left: .25rem;
+    padding-right: .25rem;
 }
 
-/* ajuste si besoin */
+/* ------------------------- Zone “Salle” (SVG) --------------------------- */
+/* Hauteur responsive : occupe l’espace dispo sous la navbar + footer.
+   La valeur 280px couvre titre, actions, marges et pied de page. */
+.room-scroll {
+    height: calc(100vh - 280px);
+    overflow: auto;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: .6rem;
+    padding: .25rem;
+}
 
-/* Colonne élèves : compacte + étroite en desktop */
+/* Tableau (panneau) : contraste fort + lisibilité */
+.board-rect {
+    fill: #1f2937;
+    stroke: #111827;
+    stroke-width: 1.5;
+    rx: 6px;
+}
+
+.board-label {
+    fill: #cbd5e1;
+    font-weight: 600;
+    letter-spacing: .02em;
+    font-size: 12px;
+}
+
+/* Tables et sièges : fond clair, bord doux ; sièges cliquables */
+.table-rect {
+    fill: #f1f3f5;
+    stroke: #cfd4da;
+}
+
+.seat-cell {
+    cursor: pointer;
+}
+
+/* Siège libre : transparent pour voir la table */
+.seat-free {
+    fill: rgba(0, 0, 0, 0);
+}
+
+/* Siège occupé : léger aplat bleu, non agressif */
+.seat-occupied {
+    fill: rgba(11, 87, 208, 0.12);
+}
+
+/* Sélection : bord or affirmé, priorité visuelle */
+.seat-selected {
+    stroke: #ffc107 !important;
+    stroke-width: 3;
+}
+
+/* Libellé nom : gras, centre vertical, gestion du “Prénom\nNom” */
+.seat-name {
+    fill: #212529;
+    dominant-baseline: middle;
+    font-weight: 600;
+    white-space: pre-line;
+}
+
+/* ------------------------- Panneau des élèves --------------------------- */
+/* Colonne latérale : largeur mini utile ; limitée en large écran */
 .students-panel {
     min-width: 280px;
 }
 
 @media (min-width: 1200px) {
-    /* xl */
     .students-panel {
         max-width: 360px;
     }
 }
 
-/* Corps de la carte élèves collant à la hauteur */
+/* Corps de carte latérale : colonne qui occupe la hauteur disponible */
 .students-body {
     display: flex;
     flex-direction: column;
     height: 100%;
 }
 
+/* Listes scrollables : valeur générique si utilisées hors .students-body */
+.students-scroll {
+    max-height: 70vh;
+    overflow: auto;
+}
+
+/* Deux listes visibles empilées : hauteurs adaptées au layout latéral */
 .students-body .students-scroll {
     max-height: 32vh;
 }
 
-/* 2 listes visibles mais compactes */
 @media (min-width: 1200px) {
     .students-body .students-scroll {
         max-height: 35vh;
     }
 }
 
-/* Version compacte des cartes élèves */
+/* Carte élève : compacte, cliquable, état sélectionné lisible */
+.student {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+    padding: .35rem .5rem;
+    border: 1px solid #e9ecef;
+    border-radius: .5rem;
+    background: var(--bs-body-bg);
+    cursor: pointer;
+    user-select: none;
+}
+
+.student:hover {
+    background: #f8f9fa;
+}
+
+.student.selected {
+    outline: 2px solid #0b57d0;
+}
+
+.student-name {
+    font-weight: 600;
+    font-size: .95rem;
+    line-height: 1.05;
+}
+
+.student-sub {
+    font-size: .8rem;
+    color: #6c757d;
+    line-height: 1.05;
+}
+
+/* Variante compacte (quand beaucoup de lignes à afficher) */
 .students-scroll.compact .student {
     padding: .25rem .4rem;
     border-radius: .4rem;
@@ -59,13 +165,23 @@
     transform-origin: right center;
 }
 
-/* Bouton “↔” : discret */
+/* Bouton pour masquer/afficher le panneau élèves : discret */
 #toggleStudentsPanel {
     line-height: 1;
     padding: .2rem .45rem;
 }
 
-/* Quand panneau élèves masqué : la colonne prend 0 et la salle s’étend naturellement */
+/* Quand le panneau est masqué, la salle s’étend naturellement */
 .students-hidden .students-panel {
     display: none !important;
+}
+
+/* ------------------------- Pilules “contraintes” ------------------------ */
+/* Pastilles lisibles et homogènes pour les contraintes en cours */
+.constraint-pill {
+    font-size: .9rem;
+    border: 1px solid #e9ecef;
+    border-radius: 999px;
+    padding: .25rem .5rem;
+    background: #f8fafc;
 }

@@ -4,6 +4,8 @@
 #
 #    pip-compile --output-file=requirements.txt requirements.in
 #
+absl-py==2.3.1
+    # via ortools
 amqp==5.3.1
     # via kombu
 asgiref==3.9.1
@@ -49,11 +51,19 @@ django-redis==6.0.0
     # via -r requirements.in
 gunicorn==23.0.0
     # via -r requirements.in
+immutabledict==4.2.1
+    # via ortools
 iniconfig==2.1.0
     # via pytest
 kombu[redis]==5.5.4
     # via celery
 markdown==3.8.2
+    # via -r requirements.in
+numpy==2.3.2
+    # via
+    #   ortools
+    #   pandas
+ortools==9.14.6206
     # via -r requirements.in
 packaging==25.0
     # via
@@ -61,6 +71,8 @@ packaging==25.0
     #   gunicorn
     #   kombu
     #   pytest
+pandas==2.3.2
+    # via ortools
 pillow==11.3.0
     # via cairosvg
 pip-tools==7.5.0
@@ -69,6 +81,8 @@ pluggy==1.6.0
     # via pytest
 prompt-toolkit==3.0.52
     # via click-repl
+protobuf==6.31.1
+    # via ortools
 psycopg[binary]==3.2.9
     # via -r requirements.in
 psycopg-binary==3.2.9
@@ -88,9 +102,13 @@ pytest==8.4.1
 pytest-django==4.11.1
     # via -r requirements.in
 python-dateutil==2.9.0.post0
-    # via celery
+    # via
+    #   celery
+    #   pandas
 python-dotenv==1.1.1
     # via -r requirements.in
+pytz==2025.2
+    # via pandas
 redis==5.2.1
     # via
     #   -r requirements.in
@@ -105,9 +123,13 @@ tinycss2==1.4.0
     #   cairosvg
     #   cssselect2
 typing-extensions==4.14.1
-    # via psycopg
+    # via
+    #   ortools
+    #   psycopg
 tzdata==2025.2
-    # via kombu
+    # via
+    #   kombu
+    #   pandas
 vine==5.1.0
     # via
     #   amqp

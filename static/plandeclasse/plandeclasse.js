@@ -17,7 +17,13 @@ const state = {
     forbidden: new Set(), // Set<"x,y,s">
     placements: new Map(), // Map<seatKey, studentId>
     placedByStudent: new Map(), // Map<studentId, seatKey>
-    options: {prefer_mixage: true, prefer_alone: true},
+    options: {
+        solver: "cpsat",
+        prefer_mixage: true,
+        prefer_alone: true,
+        time_budget_ms: 60000
+    },
+
     nameView: "first", // "first" | "last" | "both"
     constraints: [], // {type, a?, b?, x?, y?, s?, k?, d?, human, key?}
 };

@@ -1,0 +1,50 @@
+{
+  "schema": [
+    [
+      2,
+      2
+    ],
+    [
+      2,
+      2
+    ]
+  ],
+  "students": [
+    {
+      "id": 0,
+      "name": "DOE John",
+      "first": "John",
+      "last": "DOE",
+      "gender": "M"
+    },
+    {
+      "id": 1,
+      "name": "DUPONT Alice",
+      "first": "Alice",
+      "last": "DUPONT",
+      "gender": "F"
+    },
+    {
+      "id": 2,
+      "name": "MARTIN Paul",
+      "first": "Paul",
+      "last": "MARTIN",
+      "gender": "M"
+    },
+    {
+      "id": 3,
+      "name": "DURAND Emma",
+      "first": "Emma",
+      "last": "DURAND",
+      "gender": "F"
+    }
+  ],
+  "options": {
+    "prefer_mixage": true,
+    "prefer_alone": true
+  },
+  "constraints": [],
+  "forbidden": [],
+  "placements": {},
+  "name_view": "first"
+}

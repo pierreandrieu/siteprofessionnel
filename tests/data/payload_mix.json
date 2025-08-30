@@ -1,0 +1,86 @@
+{
+  "schema": [
+    [
+      3,
+      3
+    ],
+    [
+      3,
+      3
+    ]
+  ],
+  "students": [
+    {
+      "id": 0,
+      "name": "AAA A",
+      "first": "A",
+      "last": "AAA",
+      "gender": "F"
+    },
+    {
+      "id": 1,
+      "name": "BBB B",
+      "first": "B",
+      "last": "BBB",
+      "gender": "M"
+    },
+    {
+      "id": 2,
+      "name": "CCC C",
+      "first": "C",
+      "last": "CCC",
+      "gender": "F"
+    },
+    {
+      "id": 3,
+      "name": "DDD D",
+      "first": "D",
+      "last": "DDD",
+      "gender": "M"
+    },
+    {
+      "id": 4,
+      "name": "EEE E",
+      "first": "E",
+      "last": "EEE",
+      "gender": "F"
+    },
+    {
+      "id": 5,
+      "name": "FFF F",
+      "first": "F",
+      "last": "FFF",
+      "gender": "M"
+    }
+  ],
+  "options": {
+    "prefer_mixage": true,
+    "prefer_alone": true
+  },
+  "constraints": [
+    {
+      "type": "front_rows",
+      "eleve": 0,
+      "k": 1,
+      "human": "A en 1ère rangée"
+    },
+    {
+      "type": "far_apart",
+      "a": 0,
+      "b": 2,
+      "d": 2,
+      "human": "A loin de C (d>=2)"
+    },
+    {
+      "type": "same_table",
+      "a": 1,
+      "b": 3,
+      "human": "B et D même table"
+    }
+  ],
+  "forbidden": [
+    "0,1,2"
+  ],
+  "placements": {},
+  "name_view": "first"
+}

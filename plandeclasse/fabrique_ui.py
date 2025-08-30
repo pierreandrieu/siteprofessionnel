@@ -61,19 +61,24 @@ def fabrique_contraintes_ui(
         # normalise pour la fabrique:
         code: Dict[str, Any] = {"type": typ}
 
+        # plandeclasse/fabrique_ui.py  (in the unaires branch)
+        # ...
         if typ in {TypeContrainte.PREMIERES_RANGEES.value,
                    TypeContrainte.DERNIERES_RANGEES.value,
                    TypeContrainte.SEUL_A_TABLE.value,
                    TypeContrainte.VOISIN_VIDE.value,
                    TypeContrainte.EXACT_SEAT.value}:
-            # UI stocke 'a' pour l'élève ; la fabrique attend 'eleve'
-            sid = int(c.get("a") or c.get("eleve") or c.get("studentId", -1))
-            if sid >= 0:
-                code["eleve"] = id2nom[sid]
+
+            # accept 'eleve' | 'a' | 'studentId'
+            sid_raw = c.get("eleve", c.get("a", c.get("studentId")))
+            if sid_raw is None:
+                raise ValueError(f"contrainte {typ} sans identifiant d'élève ('eleve'/'a'/'studentId')")
+            sid = int(sid_raw)
+            code["eleve"] = id2nom[sid]
+
             if "k" in c: code["k"] = int(c["k"])
             if "x" in c: code["x"] = int(c["x"])
             if "y" in c: code["y"] = int(c["y"])
-            # UI met 's' ; la fabrique attend 'seat'
             if "s" in c: code["seat"] = int(c["s"])
             if "seat" in c: code["seat"] = int(c["seat"])
 
