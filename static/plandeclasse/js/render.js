@@ -9,6 +9,59 @@
 import {state} from "./state.js";
 import {$, buildDisplayMaps} from "./utils.js";
 
+/* ==========================================================================
+   Dimensions & compaction
+   ========================================================================== */
+
+/**
+ * Calcule des dimensions “compactes” pour l’UI.
+ * On réduit légèrement hauteur/espacement quand il y a beaucoup de rangées,
+ * tout en gardant une largeur raisonnable pour laisser respirer les noms.
+ *
+ * @param {number[][]} schema - matrice des capacités par rangée
+ * @returns {{
+ *   padX:number,padY:number,seatW:number,tableH:number,
+ *   seatGap:number,colGap:number,rowGap:number,boardH:number
+ * }}
+ */
+function computeDims(schema) {
+    const rows = schema.length;
+
+    // Base UI : valeurs confort
+    const base = {
+        padX: 16,
+        padY: 12,
+        seatW: 80,  // largeur d’un siège (UI)
+        tableH: 30, // hauteur d’une table (UI)
+        seatGap: 4, // séparateur fin entre sièges
+        colGap: 16, // écart entre tables d’une même rangée
+        rowGap: 22, // écart vertical entre rangées
+        boardH: 18, // bandeau "tableau"
+    };
+
+    // Plus de rangées = compacter un peu en vertical (sans écraser).
+    // Exemple : à partir de 5 rangées, on réduit de ~7% par rangée (min 72%).
+    const vFactor = Math.max(0.72, 1 - Math.max(0, rows - 4) * 0.07);
+
+    // En horizontal, réduction très légère après 6 rangées.
+    const hFactor = Math.max(0.88, 1 - Math.max(0, rows - 6) * 0.02);
+
+    return {
+        padX: base.padX,
+        padY: base.padY,
+        seatW: Math.round(base.seatW * hFactor),         // ex: 80 → ~74
+        tableH: Math.round(base.tableH * vFactor),       // ex: 46 → ~36 avec bcp de rangées
+        seatGap: base.seatGap,
+        colGap: base.colGap,
+        rowGap: Math.round(base.rowGap * vFactor),       // ex: 22 → ~16
+        boardH: base.boardH,
+    };
+}
+
+/* ==========================================================================
+   UI : boutons & texte
+   ========================================================================== */
+
 /** Met à jour le libellé/disponibilité du bouton « bannir le siège » selon la sélection. */
 export function updateBanButtonLabel() {
     const btn = document.getElementById("btnToggleBan");
@@ -27,7 +80,16 @@ export function updateBanButtonLabel() {
     btn.textContent = forbidden ? "rendre le siège disponible" : "le siège doit rester vide";
 }
 
-/** Ajoute un <text>/<tspan> et ajuste la police pour tenir dans le rectangle. */
+/**
+ * Ajoute un <text>/<tspan> et ajuste la police pour tenir dans le rectangle.
+ * @param {SVGSVGElement} svg
+ * @param {number} cx
+ * @param {number} cy
+ * @param {number} seatW
+ * @param {number} seatH
+ * @param {string} text
+ * @param {string} seatKey
+ */
 function appendSeatLabelFitted(svg, cx, cy, seatW, seatH, text, seatKey) {
     const lines = String(text || "").split("\n");
     const ns = "http://www.w3.org/2000/svg";
@@ -75,8 +137,9 @@ function appendSeatLabelFitted(svg, cx, cy, seatW, seatH, text, seatKey) {
         size -= 1;
     }
 
-    const bbox = textEl.getBBox();
-    if (bbox.width > maxWidth && tspans.length) {
+    // Ellipse ultime si trop large
+    const bbox2 = textEl.getBBox();
+    if (bbox2.width > maxWidth && tspans.length) {
         const last = tspans[tspans.length - 1];
         const original = last.textContent || "";
         if (original.length > 3) {
@@ -90,6 +153,10 @@ function appendSeatLabelFitted(svg, cx, cy, seatW, seatH, text, seatKey) {
     }
 }
 
+/* ==========================================================================
+   Rendu du SVG salle
+   ========================================================================== */
+
 /** Rendu du SVG de la salle (tables, sièges, bordures, hatch des interdits, labels). */
 export function renderRoom() {
     const svg = /** @type {SVGSVGElement|null} */ ($("#roomCanvas"));
@@ -102,10 +169,8 @@ export function renderRoom() {
         return;
     }
 
-    // Dimensions
-    const padX = 20, padY = 16;
-    const seatW = 90, tableH = 70;
-    const seatGap = 6, colGap = 20, rowGap = 38;
+    // Dimensions (compactes) calculées selon le schéma
+    const {padX, padY, seatW, tableH, seatGap, colGap, rowGap, boardH} = computeDims(state.schema);
 
     // Largeurs de rangée (centrage)
     const rowWidths = state.schema.map((caps) => {
@@ -118,11 +183,10 @@ export function renderRoom() {
 
     const boardX = padX + (maxRowW - boardW) / 2;
     const boardY = padY;
-    const boardH = 16;
 
     // Y de départ pour chaque rangée
     const rowOriginsY = [];
-    let curY = boardY + boardH + 14;
+    let curY = boardY + boardH + 10;
     for (let y = 0; y < rows; y++) {
         rowOriginsY.push(curY);
         curY += tableH + rowGap;
@@ -133,7 +197,8 @@ export function renderRoom() {
 
     svg.setAttribute("viewBox", `0 0 ${totalWidth} ${totalHeight}`);
     svg.style.minWidth = totalWidth + "px";
-    svg.style.minHeight = Math.min(900, totalHeight) + "px";
+    // Laisse le conteneur .room-scroll gérer la hauteur; on évite de forcer ici.
+    svg.style.minHeight = Math.min(800, totalHeight) + "px";
 
     const ns = "http://www.w3.org/2000/svg";
 
@@ -174,22 +239,22 @@ export function renderRoom() {
     boardLabel.setAttribute("y", String(boardY - 4));
     boardLabel.setAttribute("text-anchor", "middle");
     boardLabel.setAttribute("class", "board-label");
-    boardLabel.textContent = "tableau";
+    boardLabel.textContent = "TABLEAU";
     svg.appendChild(boardLabel);
 
     const {firstMap, lastMap, bothMap} = buildDisplayMaps(state.students);
 
     for (let y = 0; y < rows; y++) {
         const caps = state.schema[y];
-        const tablesW = caps.reduce((sum, cap) => sum + cap * 90 + (cap - 1) * 6, 0);
-        const between = (caps.length - 1) * 20;
+        const tablesW = caps.reduce((sum, cap) => sum + cap * seatW + (cap - 1) * seatGap, 0);
+        const between = (caps.length - 1) * colGap;
         const rowW = tablesW + between;
         let ox = padX + (maxRowW - rowW) / 2;
         const oy = rowOriginsY[y];
 
         for (let x = 0; x < caps.length; x++) {
             const cap = caps[x];
-            const tableWidth = cap * 90 + (cap - 1) * 6;
+            const tableWidth = cap * seatW + (cap - 1) * seatGap;
 
             const rect = document.createElementNS(ns, "rect");
             rect.setAttribute("x", String(ox));
@@ -201,7 +266,7 @@ export function renderRoom() {
             svg.appendChild(rect);
 
             for (let s = 0; s < cap; s++) {
-                const sx = ox + s * (90 + 6);
+                const sx = ox + s * (seatW + seatGap);
                 const sy = oy;
                 const seatKey = `${x},${y},${s}`;
                 const occupant = state.placements.get(seatKey) ?? null;
@@ -211,14 +276,14 @@ export function renderRoom() {
                 const seatRect = document.createElementNS(ns, "rect");
                 seatRect.setAttribute("x", String(sx));
                 seatRect.setAttribute("y", String(sy));
-                seatRect.setAttribute("width", "90");
+                seatRect.setAttribute("width", String(seatW));
                 seatRect.setAttribute("height", String(tableH));
                 seatRect.setAttribute("data-seat", seatKey);
                 seatRect.setAttribute(
                     "class",
                     "seat-cell " +
                     (isForbidden ? "seat-forbidden " : occupant != null ? "seat-occupied " : "seat-free ") +
-                    (isSelectedSeat ? "seat-selected" : ""),
+                    (isSelectedSeat ? "seat-selected" : "")
                 );
 
                 if (isForbidden) {
@@ -230,21 +295,23 @@ export function renderRoom() {
                 }
                 svg.appendChild(seatRect);
 
+                // Croisillon d’overlay sur les sièges interdits
                 if (isForbidden) {
                     const cross = document.createElementNS(ns, "path");
                     const pad = 8;
                     const x1 = sx + pad, y1 = sy + pad;
-                    const x2 = sx + 90 - pad, y2 = sy + tableH - pad;
+                    const x2 = sx + seatW - pad, y2 = sy + tableH - pad;
                     const x3 = sx + pad, y3 = sy + tableH - pad;
-                    const x4 = sx + 90 - pad, y4 = sy + pad;
+                    const x4 = sx + seatW - pad, y4 = sy + pad;
                     cross.setAttribute("d", `M${x1},${y1} L${x2},${y2} M${x3},${y3} L${x4},${y4}`);
                     cross.setAttribute("class", "seat-forbidden-cross");
                     svg.appendChild(cross);
                 }
 
+                // Séparateur fin entre sièges
                 if (s < cap - 1) {
                     const divider = document.createElementNS(ns, "rect");
-                    divider.setAttribute("x", String(sx + 90 + 6 / 2 - 0.5));
+                    divider.setAttribute("x", String(sx + seatW + seatGap / 2 - 0.5));
                     divider.setAttribute("y", String(sy + 6));
                     divider.setAttribute("width", "1");
                     divider.setAttribute("height", String(tableH - 12));
@@ -252,6 +319,7 @@ export function renderRoom() {
                     svg.appendChild(divider);
                 }
 
+                // Label prénom/nom
                 if (occupant != null) {
                     const nm =
                         state.nameView === "first"
@@ -259,17 +327,22 @@ export function renderRoom() {
                             : state.nameView === "last"
                                 ? lastMap.get(occupant) || ""
                                 : bothMap.get(occupant) || "";
-                    const cx = sx + 90 / 2;
+                    const cx = sx + seatW / 2;
                     const cy = sy + tableH / 2;
-                    appendSeatLabelFitted(svg, cx, cy, 90, tableH, nm, seatKey);
+                    appendSeatLabelFitted(svg, cx, cy, seatW, tableH, nm, seatKey);
                 }
             }
-            ox += tableWidth + 20;
+
+            ox += tableWidth + colGap;
         }
     }
 }
 
-/** Rendu liste élèves (non placés/placés) + sélection d’élève. */
+/* ==========================================================================
+   Rendu de la liste élèves
+   ========================================================================== */
+
+/** Rendu liste élèves (non placés/placés) + gestion de la sélection d’élève. */
 export function renderStudents() {
     const unplaced = /** @type {HTMLElement|null} */ ($("#studentsUnplaced"));
     const placed = /** @type {HTMLElement|null} */ ($("#studentsPlaced"));
@@ -288,15 +361,17 @@ export function renderStudents() {
 
     for (const st of items) {
         if (q && !(st.first + " " + st.last).toLowerCase().includes(q)) continue;
+
         const card = document.createElement("div");
         card.className = "student" + (state.selection.studentId === st.id ? " selected" : "");
         card.dataset.sid = String(st.id);
         card.innerHTML = `
-  <div class="d-flex flex-column">
-    <span class="student-name">${st.first}</span>
-    <span class="student-sub">${st.last}</span>
-  </div>
-`;
+      <div class="d-flex flex-column">
+        <span class="student-name">${st.first}</span>
+        <span class="student-sub">${st.last}</span>
+      </div>
+    `;
+
         card.addEventListener("click", () => {
             if (state.selection.studentId === st.id) {
                 state.selection.studentId = null;

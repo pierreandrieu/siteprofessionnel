@@ -81,23 +81,34 @@
                     <div class="card-body">
                         <!-- Schéma de salle -->
                         <div class="row g-2 mb-2 align-items-end">
-                            <div class="col-4 col-md-3">
-                                <label class="form-label mb-1">rangées</label>
+                            <!-- Colonne 1 : rangées -->
+                            <div class="col-12 col-md-4 col-lg-3">
+                                <label class="form-label mb-1" for="rowsCount">nombre de rangées de la salle</label>
                                 <input id="rowsCount" type="number" min="1" max="20" value="5" class="form-control">
                             </div>
-                            <div class="col-4 col-md-3">
-                                <label class="form-label mb-1">tables / rangée</label>
-                                <input id="tablesPerRow" type="number" min="1" max="12" value="3" class="form-control">
-                            </div>
-                            <div class="col-8 col-md-6">
-                                <label class="form-label mb-1">capacités (ex : 2,3,2)</label>
+
+                            <!-- Colonne 2 : capacités par rangée  -->
+                            <div class="col-12 col-md-8 col-lg-9">
+                                <label class="form-label mb-1 d-inline-flex align-items-center gap-2"
+                                       for="rowCapacities">
+                                    capacités des tables d'une rangée (ex : 2,3,2)
+                                    <button type="button" class="btn btn-link p-0 lh-1 text-decoration-none"
+                                            data-bs-toggle="tooltip"
+                                            title="Ex. « 2,3,2 » : chaque rangée est constituée de 3 tables dont les capacités sont
+                                             respectivement 2, 3 et 2 sièges.">
+                                        ?
+                                    </button>
+                                </label>
                                 <input id="rowCapacities" class="form-control" value="2,3,2">
                             </div>
+
+                            <!-- Boutons -->
                             <div class="col-12 d-flex gap-2">
                                 <button id="btnBuildRoom" class="btn btn-primary">appliquer le schéma</button>
                                 <button id="btnClearRoom" class="btn btn-outline-secondary">réinitialiser</button>
                             </div>
                         </div>
+
 
                         <!-- Affichage des noms -->
                         <div class="d-flex align-items-center gap-2 mt-3">
@@ -176,19 +187,30 @@
                             <div class="row g-2 align-items-end">
                                 <div class="col-12 col-sm-6 col-md-4 col-lg-3">
                                     <label for="className" class="form-label mb-1">Nom de la classe</label>
-                                    <input id="className" class="form-control form-control-sm"
-                                           placeholder="ex : 2nde 3">
+                                    <input id="className" class="form-control form-control-sm" required
+                                           placeholder="ex : 2nde 3" aria-describedby="classNameHelp">
+                                    <div class="invalid-feedback">Veuillez renseigner le nom de la classe.</div>
                                 </div>
 
                                 <div class="col-12 col-sm-auto">
                                     <label class="form-label invisible d-none d-sm-block">actions</label>
-                                    <button id="btnExport" type="button" class="btn btn-outline-primary">
-                                        exporter le plan (PNG, PDF, JSON)
-                                    </button>
+
+                                    <!-- Wrapper pour tooltip même si le bouton est disabled -->
+                                    <span id="exportBtnWrap"
+                                          class="d-inline-block"
+                                          tabindex="0"
+                                          data-bs-toggle="tooltip"
+                                          data-bs-placement="top"
+                                          data-bs-trigger="hover focus"
+                                          title="Renseignez un nom de classe pour activer l’export">
+        <button id="btnExport" type="button" class="btn btn-outline-primary" disabled>
+          exporter le plan (PNG, PDF, JSON)
+        </button>
+      </span>
                                 </div>
                             </div>
 
-                            <!-- Liens d’export, remplis après génération -->
+                            <!-- Liens d’export -->
                             <div id="exportDownloads" class="mt-2 d-none d-flex justify-content-center gap-2 flex-wrap">
                                 <a id="exPNG" class="btn btn-sm btn-outline-secondary" href="#" target="_blank">PNG</a>
                                 <a id="exPDF" class="btn btn-sm btn-outline-secondary" href="#" target="_blank">PDF</a>
@@ -255,12 +277,33 @@
                             </div>
                         </div>
 
+                        <div class="d-flex align-items-center gap-4 my-2 flex-wrap">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="optMixage" checked>
+                                <label class="form-check-label" for="optMixage">maximiser le mixage par genre</label>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="optSolo" checked>
+                                <label class="form-check-label" for="optSolo">maximiser les élèves seuls</label>
+                            </div>
+                        </div>
+
                         <div class="d-flex align-items-center justify-content-center gap-2 mt-3">
-                            <button id="btnSolve" class="btn btn-success">
-                                générer le plan de classe avec les contraintes ci-dessous
-                            </button>
+                            <!-- Wrapper pour tooltip (le bouton disabled ne reçoit pas les événements) -->
+                            <span id="solveBtnWrap"
+                                  class="d-inline-block"
+                                  tabindex="0"
+                                  data-bs-toggle="tooltip"
+                                  data-bs-placement="top"
+                                  data-bs-trigger="hover focus"
+                                  title="Chargez un CSV d’élèves et appliquez un schéma de salle pour lancer le calcul">
+    <button id="btnSolve" class="btn btn-success" type="button" disabled>
+      générer le plan de classe avec les contraintes ci-dessous
+    </button>
+  </span>
                             <div id="solveStatus" class="small text-muted"></div>
                         </div>
+
                     </div>
 
                     <hr class="my-3">

@@ -2,22 +2,129 @@
 "use strict";
 
 /**
- * Module Solver : sérialisation du payload, démarrage du job, polling,
- * application de la solution (assignments), affichage liens d’export.
+ * Module Solver :
+ * - sérialisation du payload, démarrage du job, polling,
+ * - application de la solution (assignments),
+ * - affichage liens d’export (géré ailleurs),
+ * - + gestion de l’activation du bouton "générer" selon l’état (élèves + schéma).
  */
 
 import {state} from "./state.js";
 import {renderRoom, renderStudents, updateBanButtonLabel} from "./render.js";
 
+/* ==========================================================================
+   Eligibility (bouton "générer le plan")
+   ========================================================================== */
+
+/** Retourne true si un schéma est défini et cohérent (≥1 rangée, ≥1 table/rangée, capacités >0). */
+function schemaIsReady() {
+    const sch = state.schema;
+    if (!Array.isArray(sch) || sch.length === 0) return false;
+    for (const row of sch) {
+        if (!Array.isArray(row) || row.length === 0) return false;
+        for (const cap of row) {
+            if (!Number.isFinite(cap) || cap <= 0) return false;
+        }
+    }
+    return true;
+}
+
+/** Retourne true si au moins 1 élève est chargé. */
+function studentsAreLoaded() {
+    return Array.isArray(state.students) && state.students.length > 0;
+}
+
+/**
+ * Met à jour l’état enabled/disabled du bouton #btnSolve + tooltip d’explication sur #solveBtnWrap.
+ * Appeler cette fonction après chaque modification du CSV, du schéma, ou reset.
+ */
+export function syncSolveButtonEnabled() {
+    const btn = /** @type {HTMLButtonElement|null} */ (document.getElementById("btnSolve"));
+    const wrap = /** @type {HTMLElement|null} */ (document.getElementById("solveBtnWrap"));
+    if (!btn) return;
+
+    const hasStudents = studentsAreLoaded();
+    const hasSchema = schemaIsReady();
+    const ready = hasStudents && hasSchema;
+
+    btn.disabled = !ready;
+
+    // Gestion du tooltip avec Bootstrap (si présent)
+    if (wrap && window.bootstrap?.Tooltip) {
+        const tip = bootstrap.Tooltip.getOrCreateInstance(wrap, {
+            trigger: "hover focus",
+            placement: "top",
+            title: wrap.getAttribute("title") || "",
+        });
+
+        if (!ready) {
+            let msg = "Préparez le calcul : ";
+            if (!hasStudents && !hasSchema) {
+                msg += "chargez un CSV d'élèves et appliquez un schéma de salle.";
+            } else if (!hasStudents) {
+                msg += "chargez un CSV d'élèves.";
+            } else {
+                msg += "appliquez un schéma de salle.";
+            }
+
+            // Bootstrap 5.3 : setContent si dispo, sinon fallback title+update
+            if (typeof tip.setContent === "function") {
+                tip.setContent({".tooltip-inner": msg});
+            } else {
+                wrap.setAttribute("title", msg);
+                tip.update();
+            }
+            tip.enable();
+            wrap.classList.remove("pe-none"); // clickable pour déclencher le tooltip si disabled
+        } else {
+            try {
+                tip.hide();
+            } catch {
+            }
+            tip.disable();
+            wrap.classList.add("pe-none"); // évite de cliquer le wrapper quand actif
+        }
+
+        // Clic sur le wrapper : si disabled, montrer brièvement le tooltip (feedback user-friendly)
+        if (!wrap.dataset.wired) {
+            wrap.dataset.wired = "1";
+            wrap.addEventListener("click", (ev) => {
+                if (btn.disabled) {
+                    ev.preventDefault();
+                    try {
+                        tip.show();
+                        setTimeout(() => {
+                            try {
+                                tip.hide();
+                            } catch {
+                            }
+                        }, 1400);
+                    } catch {
+                    }
+                }
+            });
+        }
+    }
+}
+
+/** À appeler au chargement pour initialiser l’état et le tooltip. */
+export function setupSolveUI() {
+    syncSolveButtonEnabled();
+}
+
+/* ==========================================================================
+   Solveur : payload + start + polling + application
+   ========================================================================== */
+
 export function buildSolvePayload() {
     return {
         schema: state.schema,
-        students: state.students.map(s => ({
+        students: state.students.map((s) => ({
             id: s.id,
             name: s.name,
             first: s.first,
             last: s.last,
-            gender: s.gender || null
+            gender: s.gender || null,
         })),
         options: state.options,
         constraints: state.constraints,
@@ -30,20 +137,23 @@ export function buildSolvePayload() {
 let _pollTimer /**: number|null */ = null;
 
 export async function startSolve() {
-    // -- Récupération tolérante des éléments UI (peuvent ne pas exister)
-    const btn = /** @type {HTMLButtonElement|null} */ (document.getElementById("btnSolve"));
-    const statusEl = /** @type {HTMLElement|null} */        (document.getElementById("solveStatus"));
+    const btn = document.getElementById("btnSolve");
+    const statusEl = document.getElementById("solveStatus");
 
-    // Bloc "anciens" téléchargements (peut être absent selon ton HTML actuel)
-    const dl = /** @type {HTMLElement|null} */           (document.getElementById("solveDownloads"));
-    const dlPNG = /** @type {HTMLAnchorElement|null} */     (document.getElementById("dlPNG"));
-    const dlPDF = /** @type {HTMLAnchorElement|null} */     (document.getElementById("dlPDF"));
-    const dlSVG = /** @type {HTMLAnchorElement|null} */     (document.getElementById("dlSVG"));
-    const dlTXT = /** @type {HTMLAnchorElement|null} */     (document.getElementById("dlTXT"));
+    // Sécurité : si non prêt, on ne lance pas (cas de course éventuel)
+    if (!studentsAreLoaded() || !schemaIsReady()) {
+        syncSolveButtonEnabled();
+        return;
+    }
 
-    // -- UI : état initial
-    if (statusEl) statusEl.textContent = "envoi...";
-    dl?.classList.add("d-none"); // n'agit que si le bloc existe
+    const dl = document.getElementById("solveDownloads");
+    const dlPNG = document.getElementById("dlPNG");
+    const dlPDF = document.getElementById("dlPDF");
+    const dlSVG = document.getElementById("dlSVG");
+    const dlTXT = document.getElementById("dlTXT");
+
+    statusEl && (statusEl.textContent = "envoi...");
+    if (dl) dl.classList.add("d-none");
     if (_pollTimer) {
         clearInterval(_pollTimer);
         _pollTimer = null;
@@ -55,57 +165,51 @@ export async function startSolve() {
         const r = await fetch("/plandeclasse/solve/start", {
             method: "POST",
             headers: {"Content-Type": "application/json"},
-            body
+            body,
         });
         if (!r.ok) throw new Error("start failed");
         const {task_id} = await r.json();
-        if (statusEl) statusEl.textContent = "calcul en cours…";
-        if (btn) btn.disabled = true;
+        statusEl && (statusEl.textContent = "calcul en cours…");
+        if (btn) btn.setAttribute("disabled", "true");
 
-        // -- Polling
         _pollTimer = setInterval(async () => {
             try {
                 const rr = await fetch(`/plandeclasse/solve/status/${task_id}`);
                 const data = await rr.json();
-
                 if (data.status && ["PENDING", "RECEIVED", "STARTED", "RETRY"].includes(data.status)) {
-                    return; // encore en cours
+                    return;
                 }
-
                 clearInterval(_pollTimer);
                 _pollTimer = null;
-                if (btn) btn.disabled = false;
+                if (btn) btn.removeAttribute("disabled");
 
                 if (data.status === "SUCCESS") {
-                    // 1) appliquer l’affectation renvoyée par le solveur
                     applyAssignment(data.assignment || {});
-
-                    // 2) afficher les liens de téléchargement si le bloc est présent
-                    if (data.download && dl) {
-                        if (dlPNG && data.download.png) dlPNG.href = data.download.png;
-                        if (dlPDF && data.download.pdf) dlPDF.href = data.download.pdf;
-                        if (dlSVG && data.download.svg) dlSVG.href = data.download.svg;
-                        if (dlTXT && data.download.txt) dlTXT.href = data.download.txt;
+                    if (data.download && dlPNG && dlPDF && dlSVG && dlTXT && dl) {
+                        dlPNG.href = data.download.png;
+                        dlPDF.href = data.download.pdf;
+                        dlSVG.href = data.download.svg;
+                        dlTXT.href = data.download.txt;
                         dl.classList.remove("d-none");
                     }
-                    if (statusEl) statusEl.textContent = "terminé ✔";
+                    statusEl && (statusEl.textContent = "terminé ✔");
                 } else {
-                    if (statusEl) statusEl.textContent = `échec : ${data.error || "aucune solution"}`;
+                    statusEl && (statusEl.textContent = `échec : ${data.error || "aucune solution"}`);
                 }
             } catch (_e) {
                 clearInterval(_pollTimer);
                 _pollTimer = null;
-                if (btn) btn.disabled = false;
-                if (statusEl) statusEl.textContent = "erreur de polling";
+                if (btn) btn.removeAttribute("disabled");
+                statusEl && (statusEl.textContent = "erreur de polling");
             }
         }, 1000);
     } catch (_e) {
-        if (statusEl) statusEl.textContent = "erreur d’envoi";
+        statusEl && (statusEl.textContent = "erreur d’envoi");
     }
 }
 
 /** Applique une affectation renvoyée par le solveur. */
-export function applyAssignment(assignmentObj /**: Record<string,number> */) {
+export function applyAssignment(assignmentObj /*: Record<string,number> */) {
     state.placements.clear();
     state.placedByStudent.clear();
     for (const [seatKey, sid] of Object.entries(assignmentObj)) {

@@ -17,10 +17,10 @@ import {
     cancelConstraintForm,
     renderConstraints
 } from "./constraints.js";
-import {seatClick, onCanvasClick, toggleSelectedSeatBan, unassignSelected} from "./interactions.js";
+import {onCanvasClick, toggleSelectedSeatBan, unassignSelected} from "./interactions.js";
 import {applySchema} from "./schema.js";
-import {startSolve} from "./solver.js";
 import {startExport} from "./export.js";
+import {setupSolveUI, syncSolveButtonEnabled, startSolve} from "./solver.js";
 
 
 function init() {
@@ -51,6 +51,7 @@ function init() {
                 const {first, last} = splitName(r.name);
                 return {id: idx, name: r.name, gender: r.gender || null, first, last};
             });
+            syncSolveButtonEnabled()
             state.selection.studentId = null;
             state.selection.seatKey = null;
             refreshConstraintSelectors();
@@ -63,11 +64,10 @@ function init() {
     // Schéma
     $("#btnBuildRoom")?.addEventListener("click", () => {
         const rows = Number((/** @type {HTMLInputElement} */($("#rowsCount"))).value);
-        const tpr = Number((/** @type {HTMLInputElement} */($("#tablesPerRow"))).value);
         const caps = (/** @type {HTMLInputElement} */($("#rowCapacities"))).value;
         if (!Number.isFinite(rows) || rows < 1) return;
-        if (!Number.isFinite(tpr) || tpr < 1) return;
-        applySchema(rows, tpr, caps);
+        applySchema(rows, caps);
+        syncSolveButtonEnabled();
     });
 
     $("#btnClearRoom")?.addEventListener("click", () => {
@@ -81,6 +81,8 @@ function init() {
         renderStudents();
         renderConstraints();
         updateBanButtonLabel();
+        syncSolveButtonEnabled();
+
     });
 
     // Options solveur
@@ -126,3 +128,12 @@ function init() {
 }
 
 window.addEventListener("DOMContentLoaded", init);
+document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+    new bootstrap.Tooltip(el);
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+    setupSolveUI();
+    const btn = document.getElementById("btnSolve");
+    btn?.addEventListener("click", startSolve);
+});

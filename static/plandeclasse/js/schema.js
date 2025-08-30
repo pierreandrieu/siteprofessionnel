@@ -7,20 +7,14 @@
  */
 
 import {state} from "./state.js";
-import {keyOf} from "./utils.js";
 import {renderRoom, renderStudents, updateBanButtonLabel} from "./render.js";
 import {renderConstraints} from "./constraints.js";
 
-export function applySchema(rows /**: number */, tablesPerRow /**: number */, capacitiesStr /**: string */) {
+export function applySchema(rows /**: number */, capacitiesStr /**: string */) {
     const caps = capacitiesStr
         .split(/[,\s]+/)
         .map((s) => Number(s.trim()))
         .filter((n) => Number.isFinite(n) && n > 0);
-
-    if (caps.length !== tablesPerRow) {
-        alert(`le nombre de capacités (${caps.length}) doit = tables / rangée (${tablesPerRow}).`);
-        return;
-    }
 
     const newSchema = Array.from({length: rows}, () => caps.slice());
     const newPlacements = new Map();
@@ -35,7 +29,6 @@ export function applySchema(rows /**: number */, tablesPerRow /**: number */, ca
     }
 
     state.schema = newSchema;
-    state.placements = newPlacements;
     state.placedByStudent = newPlacedByStudent;
 
     const newForbidden = new Set();

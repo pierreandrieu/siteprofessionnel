@@ -197,12 +197,15 @@ def _build_export_json(data: ExportInput, class_name: str) -> bytes:
     Construit le JSON ré-importable avec toutes les infos nécessaires.
     On garde un format auto-documenté, versionné.
     """
+    code, meta = _schema_config(data.get("schema", []))
     export_obj: Dict[str, Any] = {
         "format": "plandeclasse-export",
         "version": 1,
         "exported_at": timezone.now().isoformat(),
         "class_name": class_name,
         "name_view": data.get("name_view"),
+        "room_config_code": code,  # ← AJOUT
+        "room_config": meta,  # ← AJOUT
         "schema": data.get("schema", []),
         "students": data.get("students", []),
         "options": data.get("options", {}),
@@ -291,6 +294,35 @@ def _cache_artifacts_and_urls(
     return fmt_to_url
 
 
+def _schema_config(schema: list[list[int]]) -> tuple[str, dict]:
+    """
+    Calcule un code court de configuration pour le schéma de salle.
+    Exemple : 7 rangées avec capacités [2,3,2] -> "7r232".
+    Si les rangées ne sont pas uniformes, renvoie "Nrmix".
+    Retourne (code, meta) où meta contient des détails utiles pour le JSON.
+    """
+    rows: int = len(schema)
+    if rows == 0:
+        return "0r0", {"rows": 0, "capacities": [], "uniform_rows": True}
+
+    cap_row = schema[0]
+    uniform = all(r == cap_row for r in schema)
+    cap_code = "".join(str(n) for n in cap_row) if uniform else "mix"
+    code = f"{rows}r{cap_code or '0'}"
+    meta = {
+        "rows": rows,
+        "capacities": cap_row,
+        "uniform_rows": uniform,
+    }
+    return code, meta
+
+
+def _day_month_stamp() -> str:
+    """Horodatage JJ-MM (ex. 31-08)."""
+    dt: datetime = timezone.now()
+    return dt.strftime("%d-%m")
+
+
 @csrf_exempt
 @require_POST
 def export_plan(request: HttpRequest) -> HttpResponse:
@@ -304,10 +336,19 @@ def export_plan(request: HttpRequest) -> HttpResponse:
         return JsonResponse({"error": "JSON invalide"}, status=400)
 
     raw_name: str = (data.get("class_name") or "").strip()
-    class_name: str = raw_name or "classe"
+    if not raw_name:
+        # Nom de classe obligatoire côté backend aussi
+        return JsonResponse({"error": "nom de classe requis"}, status=400)
+
+    class_name: str = raw_name
     slug: str = _slugify_filename(class_name)
-    stamp: str = _now_stamp()
-    prefix: str = f"{slug}_{stamp}"
+
+    # Code de config depuis le schéma, + date JJ-MM
+    code, _meta = _schema_config(data.get("schema", []))
+    stamp: str = _day_month_stamp()
+
+    # Préfixe : <classe>_config=<code>_<JJ>-<MM>
+    prefix: str = f"{slug}_config={code}_{stamp}"
 
     # 1) JSON ré-importable
     json_bytes: bytes = _build_export_json(data, class_name)
