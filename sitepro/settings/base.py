@@ -132,3 +132,22 @@ LOGGING = {
         },
     },
 }
+
+# --- Redis / Celery ---
+CELERY_BROKER_URL = "redis://localhost:6379/0"
+CELERY_RESULT_BACKEND = "redis://localhost:6379/1"
+CELERY_TASK_SERIALIZER = "json"
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_RESULT_EXPIRES = 3600  # 1h
+CELERY_TASK_TIME_LIMIT = 120  # 2 min (ajuste)
+CELERY_TASK_SOFT_TIME_LIMIT = 110
+
+# Cache sur Redis (pour stocker les artefacts binaires, pas de DB)
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": "redis://localhost:6379/2",
+        "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
+        "TIMEOUT": 3600,  # 1h
+    }
+}
