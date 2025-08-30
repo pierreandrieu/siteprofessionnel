@@ -104,12 +104,20 @@ export function toggleSelectedSeatBan() {
 export function unassignSelected() {
     const k = state.selection.seatKey;
     if (!k) return;
+
     const sid = state.placements.get(k);
-    if (sid != null) {
-        state.placements.delete(k);
-        state.placedByStudent.delete(sid);
-        renderRoom();
-        renderStudents();
-        updateBanButtonLabel();
-    }
+    if (sid == null) return;             // rien à retirer
+
+    // Supprime l’affectation
+    state.placements.delete(k);
+    state.placedByStudent.delete(sid);
+
+    // Désélectionne tout (élève + siège)
+    state.selection.studentId = null;
+    state.selection.seatKey = null;
+
+    // Re-rendu + synchro des boutons (ban / retirer)
+    renderRoom();
+    renderStudents();
+    updateBanButtonLabel();
 }

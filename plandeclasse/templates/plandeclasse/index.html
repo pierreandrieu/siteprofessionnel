@@ -12,33 +12,44 @@
         <div class="row g-3 align-items-stretch">
 
             <!-- ====== Carte 1 : Données élèves (CSV) ====== -->
+            <!-- ====== Carte 1 : Données élèves (CSV ou JSON d’export) ====== -->
             <div class="col-12">
                 <div class="card shadow-sm">
                     <div class="card-header py-2">
-                        <strong>données élèves (CSV)</strong>
+                        <strong>données élèves (CSV ou JSON)</strong>
                     </div>
                     <div class="card-body">
-                        <div class="row g-2 align-items-center">
+                        <div class="row g-3 align-items-start">
                             <div class="col-12 col-sm-7 col-md-6 col-lg-5">
-                                <input id="csvInput" class="form-control w-100" type="file" accept=".csv">
+                                <input id="csvInput" class="form-control w-100" type="file" accept=".csv,.json">
                             </div>
+
                             <div class="col">
                                 <div class="small text-muted">
-                                    Pronote → <em>Mes données</em> → <em>Liste des élèves</em> → choisir la classe →
-                                    « copier la liste (format CSV) » dont l'icône est
-                                    <span>
-                <div class="col-auto d-none d-sm-inline-block">
-                  <img src="{% static 'bouton_export_csv.png' %}" alt="bouton export CSV pronote"
-                       style="height:50px;opacity:.9">
-                </div>
-                <br>Puis sélectionnez ce fichier ici.
-              </span>
+                                    <strong>Deux façons de charger les données :</strong>
+                                    <ul class="mb-2 mt-1">
+                                        <li>
+                                            <strong>CSV Pronote</strong> : <em>Mes données → Liste des élèves</em> →
+                                            choisir la classe → cliquer
+                                            sur « copier la liste (format CSV) » puis sélectionner le fichier ici.
+                                        </li>
+                                        <li>
+                                            <strong>JSON d’export</strong> : sélectionnez un fichier précédemment
+                                            exporté depuis cet outil
+                                            (contient élèves, placements, contraintes, schéma, etc.).
+                                        </li>
+                                    </ul>
+                                    <div class="d-none d-sm-inline-block">
+                                        <img src="{% static 'bouton_export_csv.png' %}" alt="bouton export CSV pronote"
+                                             style="height:50px;opacity:.9">
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
+
 
             <!-- ====== Carte 2 : Liste des élèves ====== -->
             <div class="col-12">

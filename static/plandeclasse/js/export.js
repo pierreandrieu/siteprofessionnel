@@ -29,7 +29,7 @@ function svgInlineStyles() {
     // NB : si vous changez les couleurs dans plandeclasse.css, gardez la cohérence ici.
     return `
 .board-rect{fill:#1f2937;stroke:#111827;stroke-width:1.5}
-.board-label{fill:#cbd5e1;font-weight:600;letter-spacing:.02em;font-size:12px}
+.board-label{fill:#994444;font-weight:600;letter-spacing:.02em;font-size:12px}
 .table-rect{fill:#f1f3f5;stroke:#cfd4da}
 .seat-cell{cursor:default}
 .seat-free{fill:rgba(255,255,255,.6)}
@@ -210,29 +210,39 @@ export async function startExport() {
 
 /**
  * Prépare l’UI d’export :
- * - bouton désactivé tant que le champ “Nom de la classe” est vide,
- * - enlève .is-invalid à la saisie,
- * - bind du clic sur #btnExport si pas déjà câblé.
+ * - le champ “Nom de la classe” est requis,
+ * - (ré)active le bouton si le champ n’est pas vide,
+ * - enlève .is-invalid dès qu’on saisit quelque chose,
+ * - câble le clic sur #btnExport (une seule fois),
+ * - lance une synchronisation initiale (utile si le nom vient d’un import JSON).
  */
 export function setupExportUI() {
-    const classInput = /** @type {HTMLInputElement|null} */ ($("#className"));
-    const btn = /** @type {HTMLButtonElement|null} */ ($("#btnExport"));
+    /** @type {HTMLInputElement|null} */
+    const classInput = document.getElementById("className");
+    /** @type {HTMLButtonElement|null} */
+    const btn = document.getElementById("btnExport");
 
+    // Champ requis + synchronisation sur saisie/changement
     if (classInput) {
         classInput.required = true;
-        const sync = () => {
-            const hasName = classInput.value.trim().length > 0;
-            if (btn) btn.disabled = !hasName;
-            if (hasName) classInput.classList.remove("is-invalid");
+
+        const onEdit = () => {
+            // Active/désactive le bouton + gère le tooltip wrapper
+            syncExportButtonEnabled();
+            // Enlève l’état invalide si l’utilisateur a commencé à saisir
+            if (classInput.value.trim().length > 0) {
+                classInput.classList.remove("is-invalid");
+            }
         };
-        classInput.addEventListener("input", sync);
-        // premier sync à l’ouverture
-        sync();
+
+        classInput.addEventListener("input", onEdit);
+        classInput.addEventListener("change", onEdit);
     } else if (btn) {
-        // pas de champ -> on laisse cliquable (fallback)
+        // Pas de champ -> on laisse cliquable (fallback)
         btn.disabled = false;
     }
 
+    // Bind du bouton (une seule fois)
     if (btn && !btn.dataset.wired) {
         btn.dataset.wired = "1";
         btn.addEventListener("click", (ev) => {
@@ -240,11 +250,75 @@ export function setupExportUI() {
             startExport();
         });
     }
+
+    // Sync initiale : prend en compte un nom pré-rempli (ex. import JSON)
+    syncExportButtonEnabled();
 }
+
 
 // Auto-init à l’ouverture de la page (sécurisé)
 if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => setupExportUI());
 } else {
     setupExportUI();
+}
+
+/** Active/désactive le bouton d’export selon la présence d’un nom de classe. */
+export function syncExportButtonEnabled() {
+    /** @type {HTMLButtonElement|null} */
+    const btn = document.getElementById("btnExport");
+    /** @type {HTMLElement|null} */
+    const wrap = document.getElementById("exportBtnWrap");
+    /** @type {HTMLInputElement|null} */
+    const input = document.getElementById("className");
+    if (!btn || !input) return;
+
+    const hasName = !!input.value.trim();
+    btn.disabled = !hasName;
+
+    // Tooltip explicatif tant que désactivé
+    if (wrap && window.bootstrap?.Tooltip) {
+        const tip = bootstrap.Tooltip.getOrCreateInstance(wrap, {
+            trigger: "hover focus",
+            placement: "top",
+            title: wrap.getAttribute("title") || "Renseignez un nom de classe pour activer l’export",
+        });
+        if (!hasName) {
+            if (typeof tip.setContent === "function") {
+                tip.setContent({".tooltip-inner": "Renseignez un nom de classe pour activer l’export"});
+            } else {
+                wrap.setAttribute("title", "Renseignez un nom de classe pour activer l’export");
+                tip.update();
+            }
+            tip.enable();
+            wrap.classList.remove("pe-none");
+        } else {
+            try {
+                tip.hide();
+            } catch {
+            }
+            tip.disable();
+            wrap.classList.remove("pe-none");
+            wrap.removeAttribute("title");
+        }
+        // Clic sur wrapper quand désactivé → affiche brièvement l’aide
+        if (!wrap.dataset.wired) {
+            wrap.dataset.wired = "1";
+            wrap.addEventListener("click", (ev) => {
+                if (btn.disabled) {
+                    ev.preventDefault();
+                    try {
+                        tip.show();
+                        setTimeout(() => {
+                            try {
+                                tip.hide();
+                            } catch {
+                            }
+                        }, 1200);
+                    } catch {
+                    }
+                }
+            });
+        }
+    }
 }

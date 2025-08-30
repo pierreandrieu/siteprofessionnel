@@ -62,23 +62,48 @@ function computeDims(schema) {
    UI : boutons & texte
    ========================================================================== */
 
-/** Met à jour le libellé/disponibilité du bouton « bannir le siège » selon la sélection. */
+/**
+ * Met à jour l'état des actions liées au siège sélectionné :
+ * - Bouton « le siège doit rester vide » :
+ *     • activé uniquement si un siège VIDE est sélectionné ;
+ *     • libellé bascule en « rendre le siège disponible » si ce siège est déjà interdit.
+ *     • désactivé s’il n’y a pas de sélection ou si le siège est occupé.
+ * - Bouton « retirer l’élève » :
+ *     • activé uniquement si un siège OCCUPÉ est sélectionné.
+ */
 export function updateBanButtonLabel() {
-    const btn = document.getElementById("btnToggleBan");
-    if (!btn) return;
+    // Actions concernées
+    const btnBan = document.getElementById("btnToggleBan");
+    const btnUnassign = document.getElementById("btnUnassign");
 
+    // Sélection courante
     const k = state.selection.seatKey;
-    const occupied = k ? state.placements.has(k) : false;
+    const hasSelection = !!k;
+    const isOccupied = hasSelection ? state.placements.has(k) : false;
 
-    if (!k || occupied) {
-        btn.disabled = true;
-        btn.textContent = "le siège doit rester vide";
-        return;
+    // --- Bouton « bannir le siège » ---
+    if (btnBan) {
+        if (!hasSelection || isOccupied) {
+            // Pas de siège / siège occupé → pas d'interdiction directement possible
+            btnBan.disabled = true;
+            btnBan.textContent = "le siège doit rester vide";
+        } else {
+            // Siège vide sélectionné → on (dé)bloque le bannissement
+            const isForbidden = state.forbidden.has(k);
+            btnBan.disabled = false;
+            btnBan.textContent = isForbidden
+                ? "rendre le siège disponible"
+                : "le siège doit rester vide";
+        }
     }
-    const forbidden = state.forbidden.has(k);
-    btn.disabled = false;
-    btn.textContent = forbidden ? "rendre le siège disponible" : "le siège doit rester vide";
+
+    // --- Bouton « retirer l’élève » ---
+    if (btnUnassign) {
+        // Actif seulement lorsqu'un siège occupé est sélectionné
+        btnUnassign.disabled = !isOccupied;
+    }
 }
+
 
 /**
  * Ajoute un <text>/<tspan> et ajuste la police pour tenir dans le rectangle.

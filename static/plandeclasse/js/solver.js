@@ -39,35 +39,48 @@ function studentsAreLoaded() {
  * Appeler cette fonction après chaque modification du CSV, du schéma, ou reset.
  */
 export function syncSolveButtonEnabled() {
-    const btn = /** @type {HTMLButtonElement|null} */ (document.getElementById("btnSolve"));
-    const wrap = /** @type {HTMLElement|null} */ (document.getElementById("solveBtnWrap"));
+    /** @type {HTMLButtonElement|null} */
+    const btn = document.getElementById("btnSolve");
+    /** @type {HTMLElement|null} */
+    const wrap = document.getElementById("solveBtnWrap");
     if (!btn) return;
 
-    const hasStudents = studentsAreLoaded();
-    const hasSchema = schemaIsReady();
-    const ready = hasStudents && hasSchema;
+    // --- Vérifie la présence d'élèves chargés ---
+    const hasStudents = Array.isArray(state.students) && state.students.length > 0;
 
+    // --- Vérifie qu'un schéma valide est défini (>= 1 rangée, capacités > 0) ---
+    const hasSchema = (function schemaIsReady() {
+        const sch = state.schema;
+        if (!Array.isArray(sch) || sch.length === 0) return false;
+        for (const row of sch) {
+            if (!Array.isArray(row) || row.length === 0) return false;
+            for (const cap of row) {
+                if (!Number.isFinite(cap) || cap <= 0) return false;
+            }
+        }
+        return true;
+    })();
+
+    // --- État final : prêt si élèves + schéma ---
+    const ready = hasStudents && hasSchema;
     btn.disabled = !ready;
 
-    // Gestion du tooltip avec Bootstrap (si présent)
+    // --- Tooltip Bootstrap sur le wrapper pour expliquer pourquoi c'est désactivé ---
     if (wrap && window.bootstrap?.Tooltip) {
         const tip = bootstrap.Tooltip.getOrCreateInstance(wrap, {
             trigger: "hover focus",
             placement: "top",
-            title: wrap.getAttribute("title") || "",
+            title: wrap.getAttribute("title") || "", // contenu par défaut (sera mis à jour)
         });
 
         if (!ready) {
+            // Message conditionnel (pédagogique)
             let msg = "Préparez le calcul : ";
-            if (!hasStudents && !hasSchema) {
-                msg += "chargez un CSV d'élèves et appliquez un schéma de salle.";
-            } else if (!hasStudents) {
-                msg += "chargez un CSV d'élèves.";
-            } else {
-                msg += "appliquez un schéma de salle.";
-            }
+            if (!hasStudents && !hasSchema) msg += "chargez un CSV/JSON et appliquez un schéma de salle.";
+            else if (!hasStudents) msg += "chargez un CSV/JSON d’élèves.";
+            else msg += "appliquez un schéma de salle.";
 
-            // Bootstrap 5.3 : setContent si dispo, sinon fallback title+update
+            // Bootstrap 5.3+ : setContent si disponible, sinon fallback title + update
             if (typeof tip.setContent === "function") {
                 tip.setContent({".tooltip-inner": msg});
             } else {
@@ -75,17 +88,23 @@ export function syncSolveButtonEnabled() {
                 tip.update();
             }
             tip.enable();
-            wrap.classList.remove("pe-none"); // clickable pour déclencher le tooltip si disabled
+
+            // NE PAS utiliser 'pe-none' : sinon le bouton enfant ne reçoit plus les clics
+            wrap.classList.remove("pe-none");
         } else {
+            // Quand tout est prêt : plus de tooltip bloquant
             try {
                 tip.hide();
             } catch {
             }
             tip.disable();
-            wrap.classList.add("pe-none"); // évite de cliquer le wrapper quand actif
+            wrap.classList.remove("pe-none");
+            // Nettoie l’attribut title pour éviter un ancien message résiduel
+            wrap.removeAttribute("title");
         }
 
-        // Clic sur le wrapper : si disabled, montrer brièvement le tooltip (feedback user-friendly)
+        // Petit confort : si l'utilisateur clique le wrapper alors que le bouton est
+        // disabled, on affiche brièvement le tooltip pour expliquer quoi faire.
         if (!wrap.dataset.wired) {
             wrap.dataset.wired = "1";
             wrap.addEventListener("click", (ev) => {
@@ -106,7 +125,6 @@ export function syncSolveButtonEnabled() {
         }
     }
 }
-
 /** À appeler au chargement pour initialiser l’état et le tooltip. */
 export function setupSolveUI() {
     syncSolveButtonEnabled();

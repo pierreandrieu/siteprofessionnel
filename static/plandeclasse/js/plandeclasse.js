@@ -7,8 +7,7 @@
  */
 
 import {state} from "./state.js";
-import {$, splitName} from "./utils.js";
-import {parseCSV} from "./csv.js";
+import {$} from "./utils.js";
 import {renderRoom, renderStudents, updateBanButtonLabel} from "./render.js";
 import {
     refreshConstraintSelectors,
@@ -19,49 +18,29 @@ import {
 } from "./constraints.js";
 import {onCanvasClick, toggleSelectedSeatBan, unassignSelected} from "./interactions.js";
 import {applySchema} from "./schema.js";
-import {startExport} from "./export.js";
+import {setupExportUI, startExport} from "./export.js";
 import {setupSolveUI, syncSolveButtonEnabled, startSolve} from "./solver.js";
-
+import {setupUnifiedImport} from "./importers.js";
 
 function init() {
     // Solve
-    document.getElementById("btnSolve")?.addEventListener("click", startSolve);
+    const btnSolve = document.getElementById("btnSolve");
+    btnSolve?.addEventListener("click", startSolve);
 
     // Colonne élèves (toggle)
     document.getElementById("toggleStudentsPanel")?.addEventListener("click", () => {
-        // On applique la classe sur #pc-root pour que le CSS puisse masquer la carte complète
         document.getElementById("pc-root")?.classList.toggle("students-hidden");
-        // Recalcule le SVG après changement de layout
-        renderRoom();
+        renderRoom(); // recalcule le viewport après changement de layout
     });
 
     // Canvas SVG (délégué)
     const canvas = document.getElementById("roomCanvas");
     if (canvas) canvas.addEventListener("click", onCanvasClick);
 
-    // CSV
-    const csvInput = /** @type {HTMLInputElement|null} */ ($("#csvInput"));
-    if (csvInput) {
-        csvInput.addEventListener("change", async (ev) => {
-            const f = /** @type {HTMLInputElement} */(ev.target).files?.[0];
-            if (!f) return;
-            const txt = await f.text();
-            const rows = parseCSV(txt);
-            state.students = rows.map((r, idx) => {
-                const {first, last} = splitName(r.name);
-                return {id: idx, name: r.name, gender: r.gender || null, first, last};
-            });
-            syncSolveButtonEnabled()
-            state.selection.studentId = null;
-            state.selection.seatKey = null;
-            refreshConstraintSelectors();
-            renderStudents();
-            renderRoom();
-            updateBanButtonLabel();
-        });
-    }
+    // >>> Import unifié (CSV ou JSON)
+    setupUnifiedImport();
 
-    // Schéma
+    // Schéma (on a supprimé l’ancien champ "tables par rangée", appliSchema(rows, capacities))
     $("#btnBuildRoom")?.addEventListener("click", () => {
         const rows = Number((/** @type {HTMLInputElement} */($("#rowsCount"))).value);
         const caps = (/** @type {HTMLInputElement} */($("#rowCapacities"))).value;
@@ -82,7 +61,6 @@ function init() {
         renderConstraints();
         updateBanButtonLabel();
         syncSolveButtonEnabled();
-
     });
 
     // Options solveur
@@ -115,9 +93,13 @@ function init() {
     $("#btnAddConstraint")?.addEventListener("click", addConstraint);
     $("#btnCancelConstraint")?.addEventListener("click", cancelConstraintForm);
 
-    // téléchargement des données
+    // Export
     document.getElementById("btnExport")?.addEventListener("click", startExport);
+    setupExportUI();
 
+    // Solve UI helpers (enable/tooltip)
+    setupSolveUI();
+    syncSolveButtonEnabled();
 
     // Rendus initiaux
     renderRoom();
@@ -125,15 +107,12 @@ function init() {
     refreshConstraintSelectors();
     onConstraintTypeChange();
     updateBanButtonLabel();
+
+    // Bootstrap tooltips
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+        // @ts-ignore: bootstrap global
+        new bootstrap.Tooltip(el);
+    });
 }
 
 window.addEventListener("DOMContentLoaded", init);
-document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
-    new bootstrap.Tooltip(el);
-});
-
-document.addEventListener("DOMContentLoaded", () => {
-    setupSolveUI();
-    const btn = document.getElementById("btnSolve");
-    btn?.addEventListener("click", startSolve);
-});
