@@ -2,19 +2,24 @@
 {% load static %}
 
 {% block title %}plan de classe{% endblock %}
+{% block extra_css %}
+    <link rel="stylesheet" href="{% static 'plandeclasse/plandeclasse.css' %}">
+{% endblock %}
 
 {% block content %}
-    <div id="pc-root" class="container-fluid py-3"><!-- ← full width -->
-        <h1 class="h4 mb-3">Génération de plan de classe sous contraintes</h1>
+    <div id="pc-root" class="container-fluid py-3">
+        <h1 class="h4 mb-3">génération de plan de classe sous contraintes</h1>
 
         <div class="row g-3 align-items-stretch">
-            <!-- Col gauche : CSV + salle (plus large) -->
-            <div class="col-12 col-xl-9 d-flex flex-column">
+            <!-- Single full-width column: CSV + controls + students strip + room -->
+            <div class="col-12 d-flex flex-column">
                 <div class="card shadow-sm flex-grow-1">
                     <div class="card-header py-2">
                         <strong>CSV élèves</strong>
                     </div>
+
                     <div class="card-body">
+                        <!-- =================== CSV input + help =================== -->
                         <div class="row g-2 align-items-center">
                             <div class="col-sm-auto">
                                 <input id="csvInput" class="form-control" type="file" accept=".csv">
@@ -23,22 +28,21 @@
                                 <div class="small text-muted">
                                     Pronote → <em>Mes données</em> → <em>Liste des élèves</em> → choisir la classe →
                                     cliquer sur « copier la liste (format CSV) » dont le logo est
-
                                     <span>
                                         <div class="col-auto d-none d-sm-block">
-                                        <img src="{% static 'bouton_export_csv.png' %}" alt="bouton export CSV pronote"
-                                             style="height:50px;opacity:.9">
+                                            <img src="{% static 'bouton_export_csv.png' %}"
+                                                 alt="bouton export CSV pronote"
+                                                 style="height:50px;opacity:.9">
                                         </div>
                                         Vous pouvez alors cliquer sur "Parcourir" et retrouver le fichier tout juste téléchargé
-
                                     </span>
                                 </div>
                             </div>
-
                         </div>
 
                         <hr>
 
+                        <!-- =================== Room schema controls =================== -->
                         <div class="row g-2 mb-2 align-items-end">
                             <div class="col-4 col-md-3">
                                 <label class="form-label mb-1">rangées</label>
@@ -58,17 +62,7 @@
                             </div>
                         </div>
 
-                        <div class="d-flex align-items-center gap-4 my-2 flex-wrap">
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="optMixage" checked>
-                                <label class="form-check-label" for="optMixage">maximiser le mixage par genre</label>
-                            </div>
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="optSolo" checked>
-                                <label class="form-check-label" for="optSolo">maximiser les élèves seuls</label>
-                            </div>
-                        </div>
-
+                        <!-- =================== Name view options =================== -->
                         <div class="d-flex align-items-center gap-2 mt-3">
                             <span class="me-2">affichage des noms</span>
                             <div class="btn-group" role="group" aria-label="affichage">
@@ -81,8 +75,47 @@
                             </div>
                         </div>
 
+                        <!-- =================== Students strip (between controls and room) =================== -->
+                        <!-- NOTE (English): Replaces the old right sidebar. Two horizontal rows:
+                             top = placed, bottom = unplaced. Each row is horizontally scrollable. -->
+                        <div class="students-strip mt-3" aria-label="liste des élèves">
+                            <div class="students-strip-header d-flex justify-content-between align-items-center">
+                                <strong>élèves</strong>
+                                <div class="d-flex align-items-center gap-2">
+                                    <input id="studentSearch" class="form-control form-control-sm"
+                                           placeholder="rechercher…" style="max-width:220px;">
+                                    <button id="toggleStudentsPanel" class="btn btn-sm btn-outline-secondary"
+                                            title="masquer/afficher la liste">↕
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Placed students row (top) -->
+                            <div class="students-strip-section">
+                                <div class="students-strip-title small text-muted mb-1">placés</div>
+                                <div id="studentsPlaced" class="students-scroll horizontal vstack gap-1 compact"
+                                     role="list"></div>
+                            </div>
+
+                            <!-- Unplaced students row (bottom) -->
+                            <div class="students-strip-section mt-2">
+                                <div class="students-strip-title small text-muted mb-1">non placés</div>
+                                <div id="studentsUnplaced" class="students-scroll horizontal vstack gap-1 compact"
+                                     role="list"></div>
+                            </div>
+                        </div>
+
+                        <!-- =================== Room SVG =================== -->
                         <div class="room-scroll mt-3">
                             <svg id="roomCanvas" class="w-100"></svg>
+                        </div>
+
+                        <!-- =================== Action buttons under room =================== -->
+                        <div class="d-flex gap-2 mt-3">
+                            <button id="btnToggleBan" class="btn btn-outline-secondary btn-sm">le siège doit rester
+                                vide
+                            </button>
+                            <button id="btnUnassign" class="btn btn-outline-secondary btn-sm">retirer l’élève</button>
                         </div>
 
                         <div class="mt-2 small text-muted">
@@ -93,46 +126,9 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Col droite : élèves (compact + masquable) -->
-            <div class="col-12 col-xl-3 students-panel">
-                <div class="card shadow-sm h-100">
-                    <div class="card-header py-2 d-flex justify-content-between align-items-center">
-                        <strong>élèves</strong>
-                        <div class="d-flex align-items-center gap-2">
-                            <input id="studentSearch" class="form-control form-control-sm" placeholder="rechercher…"
-                                   style="max-width:180px;">
-                            <button id="toggleStudentsPanel" class="btn btn-sm btn-outline-secondary"
-                                    title="masquer/afficher la liste">↔
-                            </button>
-                        </div>
-                    </div>
-                    <div class="card-body students-body">
-                        <div class="row g-2">
-                            <div class="col-12 col-md-6 col-xl-12">
-                                <div class="small text-muted mb-1">non placés</div>
-                                <div id="studentsUnplaced" class="students-scroll vstack gap-1 compact"></div>
-                            </div>
-                            <div class="col-12 col-md-6 col-xl-12">
-                                <div class="small text-muted mb-1">placés</div>
-                                <div id="studentsPlaced" class="students-scroll vstack gap-1 compact"></div>
-                            </div>
-                        </div>
-
-                        <hr class="my-2">
-
-                        <div class="d-flex gap-2">
-                            <button id="btnToggleBan" class="btn btn-outline-secondary btn-sm">le siège doit rester
-                                vide
-                            </button>
-                            <button id="btnUnassign" class="btn btn-outline-secondary btn-sm">retirer l’élève</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
 
-        <!-- Contraintes : PLEINE LARGEUR -->
+        <!-- =================== Constraints (full width) =================== -->
         <div class="row g-3 mt-3">
             <div class="col-12">
                 <div class="card shadow-sm">
@@ -153,7 +149,7 @@
                                     <option value="solo_table">seul sur sa table</option>
                                     <option value="empty_neighbor">au moins un siège vide à côté</option>
                                     <option value="same_table">à la même table que</option>
-                                    <option value="far_apart">distance d'au moins 'd' avec l'élève </option>
+                                    <option value="far_apart">distance d'au moins 'd' avec l'élève</option>
                                 </select>
                             </div>
                             <div class="col-12 col-md-4 col-lg-3" id="cstStudentBWrap" hidden>
@@ -174,6 +170,22 @@
 
                         <div class="mt-3" id="constraintsList"></div>
 
+                        <!-- =================== Maximization options moved here =================== -->
+                        <div class="solver-options mt-3">
+                            <div class="small text-muted mb-1">options de maximisation</div>
+                            <div class="d-flex align-items-center gap-4 flex-wrap">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="optMixage" checked>
+                                    <label class="form-check-label" for="optMixage">maximiser le mixage par
+                                        genre</label>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="optSolo" checked>
+                                    <label class="form-check-label" for="optSolo">maximiser les élèves seuls</label>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="mt-3 d-flex gap-2">
                             <button id="btnSolve" class="btn btn-success">calculer avec Clingo</button>
                             <div id="solveStatus" class="small text-muted"></div>
@@ -188,7 +200,7 @@
                     </div>
                 </div>
             </div>
-        </div>
+        </div> <!-- /constraints -->
     </div>
 {% endblock %}
 

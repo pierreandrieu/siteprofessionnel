@@ -1,23 +1,24 @@
 /* ==========================================================================
    Plan de classe
-   - Styles strictement liés à l’interface de plan de classe (SVG + listes)
-   - Chargé uniquement sur la page correspondante
+   - Styles dedicated to the class plan interface (SVG + students lists)
+   - Loaded only on the corresponding page
    ========================================================================== */
 
-/* Conteneur plein écran utile sur cette page (container-fluid) */
+/* ------------------------- Container layout ------------------------------ */
+/* Full-width container for this page */
 #pc-root.container-fluid {
     max-width: 100%;
 }
 
-/* Marges internes légères autour du bloc plan de classe */
+/* Light inner paddings around the main block */
 #pc-root {
     padding-left: .25rem;
     padding-right: .25rem;
 }
 
-/* ------------------------- Zone “Salle” (SVG) --------------------------- */
-/* Hauteur responsive : occupe l’espace dispo sous la navbar + footer.
-   La valeur 280px couvre titre, actions, marges et pied de page. */
+/* ------------------------- Room (SVG) ------------------------------------ */
+/* Responsive height: fills available space below navbar + footer.
+   The 280px value covers the header, actions, margins and footer. */
 .room-scroll {
     height: calc(100vh - 280px);
     overflow: auto;
@@ -27,7 +28,7 @@
     padding: .25rem;
 }
 
-/* Tableau (panneau) : contraste fort + lisibilité */
+/* Board (panel): high contrast + legibility */
 .board-rect {
     fill: #1f2937;
     stroke: #111827;
@@ -42,7 +43,7 @@
     font-size: 12px;
 }
 
-/* Tables et sièges : fond clair, bord doux ; sièges cliquables */
+/* Tables and seats: light background, soft borders; seats are clickable */
 .table-rect {
     fill: #f1f3f5;
     stroke: #cfd4da;
@@ -52,23 +53,23 @@
     cursor: pointer;
 }
 
-/* Siège libre : transparent pour voir la table */
+/* Free seat: semi-transparent to keep table visible */
 .seat-free {
-    fill: rgba(0, 0, 0, 0);
+    fill: rgba(255, 255, 255, 0.6);
 }
 
-/* Siège occupé : léger aplat bleu, non agressif */
+/* Occupied seat: very light blue */
 .seat-occupied {
     fill: rgba(11, 87, 208, 0.12);
 }
 
-/* Sélection : bord or affirmé, priorité visuelle */
+/* Selection: strong amber outline, visually prioritized */
 .seat-selected {
     stroke: #ffc107 !important;
     stroke-width: 3;
 }
 
-/* Libellé nom : gras, centre vertical, gestion du “Prénom\nNom” */
+/* Name label: bold, vertically centered, supports "First\nLast" */
 .seat-name {
     fill: #212529;
     dominant-baseline: middle;
@@ -76,54 +77,82 @@
     white-space: pre-line;
 }
 
-/* ------------------------- Panneau des élèves --------------------------- */
-/* Colonne latérale : largeur mini utile ; limitée en large écran */
-.students-panel {
-    min-width: 280px;
+/* ------------------------- Students strip (new) -------------------------- */
+/* Horizontal two-row strip placed between controls and room */
+.students-strip {
+    border: 1px solid #e5e7eb;
+    border-radius: .6rem;
+    background: #fafbfc;
+    padding: .5rem .5rem .75rem;
 }
 
-@media (min-width: 1200px) {
-    .students-panel {
-        max-width: 360px;
-    }
-}
-
-/* Corps de carte latérale : colonne qui occupe la hauteur disponible */
-.students-body {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-}
-
-/* Listes scrollables : valeur générique si utilisées hors .students-body */
-.students-scroll {
-    max-height: 70vh;
-    overflow: auto;
-}
-
-/* Deux listes visibles empilées : hauteurs adaptées au layout latéral */
-.students-body .students-scroll {
-    max-height: 32vh;
-}
-
-@media (min-width: 1200px) {
-    .students-body .students-scroll {
-        max-height: 35vh;
-    }
-}
-
-/* Carte élève : compacte, cliquable, état sélectionné lisible */
-.student {
+/* Header row with title + search + toggle button */
+.students-strip-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: .5rem;
-    padding: .35rem .5rem;
+    margin-bottom: .25rem;
+}
+
+/* Each section (placed / unplaced) */
+.students-strip-section {
+    /* keep sections visually separated but compact */
+}
+
+/* Row titles */
+.students-strip-title {
+    font-size: .95rem;
+    font-weight: 600;
+    color: #6b7280; /* muted */
+}
+
+/* Horizontal scroller for student "chips" */
+.students-scroll.horizontal {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    gap: .5rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap; /* make chips flow in a single line */
+    scrollbar-width: thin; /* Firefox */
+    padding: .25rem 0;
+    min-height: 46px; /* keep row height stable even when empty */
+    border: 1px dashed transparent; /* alignment helper if needed */
+}
+
+/* Compact variant (when many items must be visible) */
+.students-scroll.compact .student {
+    padding: .25rem .45rem;
+    border-radius: .45rem;
+}
+
+.students-scroll.compact .student-name {
+    font-size: .9rem;
+    line-height: 1.05;
+}
+
+.students-scroll.compact .student-sub {
+    font-size: .75rem;
+    line-height: 1.05;
+}
+
+/* Student chip/card (inline-flex to behave nicely in horizontal row) */
+.student {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+    padding: .35rem .6rem;
     border: 1px solid #e9ecef;
     border-radius: .5rem;
     background: var(--bs-body-bg);
     cursor: pointer;
     user-select: none;
+    min-width: 140px; /* ensures readability when many items */
+    max-width: 220px; /* prevents overly wide chips */
+    white-space: normal; /* allow two-line names if needed */
 }
 
 .student:hover {
@@ -146,42 +175,45 @@
     line-height: 1.05;
 }
 
-/* Variante compacte (quand beaucoup de lignes à afficher) */
-.students-scroll.compact .student {
-    padding: .25rem .4rem;
-    border-radius: .4rem;
-}
-
-.students-scroll.compact .student-name {
-    font-size: .9rem;
-}
-
-.students-scroll.compact .student-sub {
-    font-size: .75rem;
-}
-
 .students-scroll.compact .badge {
     transform: scale(.9);
     transform-origin: right center;
 }
 
-/* Bouton pour masquer/afficher le panneau élèves : discret */
+/* Toggle: hide the whole students strip when parent gets the marker class.
+   JS already uses #toggleStudentsPanel; it can add/remove .students-hidden on #pc-root. */
+#pc-root.students-hidden .students-strip {
+    display: none !important;
+}
+
+/* Keep the toggle button visually compact */
 #toggleStudentsPanel {
     line-height: 1;
     padding: .2rem .45rem;
 }
 
-/* Quand le panneau est masqué, la salle s’étend naturellement */
-.students-hidden .students-panel {
-    display: none !important;
-}
-
-/* ------------------------- Pilules “contraintes” ------------------------ */
-/* Pastilles lisibles et homogènes pour les contraintes en cours */
+/* ------------------------- Constraint pills ----------------------------- */
 .constraint-pill {
     font-size: .9rem;
     border: 1px solid #e9ecef;
     border-radius: 999px;
     padding: .25rem .5rem;
     background: #f8fafc;
+}
+
+/* ------------------------- Print-friendly tweaks ------------------------ */
+/* Reduce colors on print while preserving contrast */
+@media print {
+    .students-strip {
+        background: #fff;
+        border-color: #ddd;
+    }
+
+    .student.selected {
+        outline-color: #333;
+    }
+
+    .seat-occupied {
+        fill: rgba(0, 0, 0, 0.06);
+    }
 }

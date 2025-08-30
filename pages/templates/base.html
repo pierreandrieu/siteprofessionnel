@@ -9,9 +9,11 @@
     <link rel="stylesheet" href="{% static 'vendor/bootstrap/5.3.7/css/bootstrap.min.css' %}">
     <!-- css perso -->
     <link rel="stylesheet" href="{% static 'css/custom.css' %}">
+    {% block extra_css %}{% endblock %}
     <link rel="icon" href="{% static 'favicon.svg' %}" type="image/svg+xml">
     <link rel="alternate icon" href="{% static 'favicon.ico' %}" sizes="any">
     <link rel="apple-touch-icon" href="{% static 'apple-touch-icon.png' %}">
+
 </head>
 <body>
 <nav class="navbar navbar-expand-lg navbar-dark bg-primary">

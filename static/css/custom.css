@@ -1,19 +1,12 @@
-/* ==========================================================================
-   Styles généraux du site
-   - Chargé sur toutes les pages
-   ========================================================================== */
-
-/* Fond de page doux, compatible Bootstrap */
+/* === styles globaux === */
 body {
     background: #f8fafc;
 }
 
-/* Barre de navigation (couleur corporate) */
 .navbar {
     background: #0b57d0 !important;
 }
 
-/* Liens : style discret, soulignement au survol */
 a {
     text-decoration: none;
 }
@@ -22,25 +15,21 @@ a:hover {
     text-decoration: underline;
 }
 
-/* ------------------------- PDF viewer ----------------------------------- */
-/* Conteneur scrollable pour iframe/pdf */
+/* PDF viewer */
 .pdf-viewer {
     height: 70vh;
     overflow: auto;
     background: #f8f9fa;
 }
 
-/* Iframe PDF plein conteneur, sans bordure */
 .pdf-frame {
     width: 100%;
     height: 100%;
     border: 0;
 }
 
-/* ------------------------- Markdown léger ------------------------------- */
-.markdown-body h1,
-.markdown-body h2,
-.markdown-body h3 {
+/* Markdown minimal */
+.markdown-body h1, .markdown-body h2, .markdown-body h3 {
     margin-top: 1.25rem;
 }
 
@@ -61,14 +50,12 @@ a:hover {
     width: 100%;
 }
 
-.markdown-body th,
-.markdown-body td {
+.markdown-body th, .markdown-body td {
     padding: .5rem;
     border-bottom: 1px solid #e9ecef;
 }
 
-/* ------------------------- Timeline ------------------------------------- */
-/* Ligne verticale + puces pour énumérations temporelles */
+/* Timeline */
 .timeline {
     border-left: 2px solid var(--bs-border-color);
     padding-left: 1rem;
@@ -91,8 +78,7 @@ a:hover {
     border: 2px solid var(--bs-border-color);
 }
 
-/* ------------------------- Petits composants UI ------------------------- */
-/* Étiquette compacte réutilisable */
+/* Divers */
 .pill {
     display: inline-block;
     padding: .25rem .6rem;
@@ -101,7 +87,6 @@ a:hover {
     font-size: .9rem;
 }
 
-/* Encadré informatif neutre (ton clair, bords arrondis) */
 .callout {
     background: var(--bs-body-bg);
     border: 1px solid var(--bs-border-color);
@@ -118,7 +103,6 @@ a:hover {
     margin-top: .35rem;
 }
 
-/* Séparateur titré (“—  Titre  —”) */
 .labeled-hr {
     display: grid;
     place-items: center;
@@ -127,8 +111,7 @@ a:hover {
     margin: 1.5rem 0 1rem;
 }
 
-.labeled-hr::before,
-.labeled-hr::after {
+.labeled-hr::before, .labeled-hr::after {
     content: "";
     height: 1px;
     width: 100%;
@@ -144,7 +127,6 @@ a:hover {
     background: var(--bs-body-bg);
 }
 
-/* Boutons “icône + libellé” alignés proprement */
 .icon-btn {
     display: inline-flex;
     align-items: center;
@@ -157,3 +139,5 @@ a:hover {
     flex: 0 0 auto;
     fill: currentColor;
 }
+
+
