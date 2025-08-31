@@ -145,6 +145,7 @@ CELERY_TASK_TIME_LIMIT = int(os.getenv("CELERY_TASK_TIME_LIMIT", "600"))
 CELERY_TASK_SOFT_TIME_LIMIT = int(os.getenv("CELERY_TASK_SOFT_TIME_LIMIT", "500"))
 CELERY_TIMEZONE = "Europe/Paris"
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_TASK_DEFAULT_QUEUE = os.getenv("CELERY_TASK_DEFAULT_QUEUE", "celery")
 
 # --- Cache (Redis par défaut, configurable) ---
 CACHE_URL = os.getenv("DJANGO_CACHE_URL", "redis://localhost:6379/2")

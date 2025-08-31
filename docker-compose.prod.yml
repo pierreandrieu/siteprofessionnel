@@ -6,11 +6,11 @@ services:
     image: busybox:1.36
     environment:
       # proprio du static : l'utilisateur du conteneur web (10001)
-      STATIC_UID: "10001"
-      STATIC_GID: "10001"
-      # proprio du media : ton utilisateur hôte (vient de .env.prod)
-      MEDIA_UID: "${UID:-1001}"
-      MEDIA_GID: "${GID:-1001}"
+      STATIC_UID: "${STATIC_UID:-10001}"
+      STATIC_GID: "${STATIC_GID:-10001}"
+      # proprio du media : ton utilisateur *hôte*
+      MEDIA_UID: "${MEDIA_UID:-1001}"
+      MEDIA_GID: "${MEDIA_GID:-1001}"
     command: >
       sh -euxc '
         echo "[init-fs] static -> $STATIC_UID:$STATIC_GID ; media -> $MEDIA_UID:$MEDIA_GID";
@@ -25,12 +25,11 @@ services:
       - type: bind
         source: /var/www/pierreandrieu/static
         target: /host/static
-        read_only: false
       - type: bind
         source: /var/www/pierreandrieu/media
         target: /host/media
-        read_only: false
     restart: "no"
+
 
 
   # 2) Base de données
@@ -124,9 +123,9 @@ services:
     command: >
       celery -A sitepro worker
       --loglevel=INFO
-      --concurrency=${CELERY_CONCURRENCY:-2}
+      --concurrency=2
       --max-tasks-per-child=500
-      --queues=default
+      -Q celery,default
     read_only: true
     tmpfs: [ "/tmp" ]
     restart: unless-stopped
