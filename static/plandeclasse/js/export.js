@@ -49,10 +49,8 @@ function collectRoomSvgMarkup() {
     const svgEl = document.getElementById("roomCanvas");
     if (!(svgEl instanceof SVGSVGElement)) return null;
 
-    // Clone profond pour ne pas modifier l’instance visible à l’écran
     const clone = /** @type {SVGSVGElement} */ (svgEl.cloneNode(true));
 
-    // Standard : assurer le namespace + dimensions à partir du viewBox
     clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
     const vbAttr = clone.getAttribute("viewBox");
     if (vbAttr) {
@@ -63,15 +61,23 @@ function collectRoomSvgMarkup() {
         }
     }
 
-    // Injecter un <style> autonome (en tête) pour l’export
+    // <style> embarqué
     const styleEl = document.createElementNS("http://www.w3.org/2000/svg", "style");
     styleEl.setAttribute("type", "text/css");
     styleEl.textContent = svgInlineStyles();
     clone.insertBefore(styleEl, clone.firstChild);
 
-    // Sérialisation XML
+    // ✅ Fond blanc couvrant tout l'area (évite le damier sur SVG/PNG)
+    const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    bg.setAttribute("x", "0");
+    bg.setAttribute("y", "0");
+    bg.setAttribute("width", "100%");
+    bg.setAttribute("height", "100%");
+    bg.setAttribute("fill", "#ffffff");
+    // on l’insère juste après <style>, pour qu’il soit peint en premier
+    clone.insertBefore(bg, styleEl.nextSibling);
+
     const xml = new XMLSerializer().serializeToString(clone);
-    // En-tête XML pour les convertisseurs stricts
     return `<?xml version="1.0" encoding="UTF-8"?>\n${xml}`;
 }
 

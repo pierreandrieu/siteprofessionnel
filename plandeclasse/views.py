@@ -246,6 +246,7 @@ def _svg_to_png_pdf(svg_bytes: bytes) -> Tuple[Optional[bytes], Optional[bytes]]
     Convertit un SVG en PNG et PDF si CairoSVG est disponible.
     Retourne (png, pdf) – peut contenir None si indisponible.
     """
+
     try:
         import cairosvg  # type: ignore
     except Exception:
@@ -253,9 +254,17 @@ def _svg_to_png_pdf(svg_bytes: bytes) -> Tuple[Optional[bytes], Optional[bytes]]
 
     png_buf: io.BytesIO = io.BytesIO()
     pdf_buf: io.BytesIO = io.BytesIO()
-    # Conversion – exceptions remontent si problème de rendu
-    cairosvg.svg2png(bytestring=svg_bytes, write_to=png_buf)
-    cairosvg.svg2pdf(bytestring=svg_bytes, write_to=pdf_buf)
+
+    # ✅ fond blanc pour la rasterisation PNG
+    cairosvg.svg2png(bytestring=svg_bytes, write_to=png_buf, background_color="white")
+
+    # Le PDF est généralement opaque par défaut, mais on peut aussi préciser:
+    try:
+        cairosvg.svg2pdf(bytestring=svg_bytes, write_to=pdf_buf, background_color="white")
+    except TypeError:
+        # vieilles versions: pas de param; pas grave, le PDF reste blanc
+        cairosvg.svg2pdf(bytestring=svg_bytes, write_to=pdf_buf)
+
     return (png_buf.getvalue(), pdf_buf.getvalue())
 
 
