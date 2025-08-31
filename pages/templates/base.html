@@ -23,17 +23,17 @@
                 aria-expanded="false" aria-label="menu">
             <span class="navbar-toggler-icon"></span>
         </button>
-        <div id="nav" class="collapse navbar-collapse">
-            <ul class="navbar-nav ms-auto">
-                <li class="nav-item"><a class="nav-link" href="{% url 'pages:home' %}">Accueil</a></li>
-                <li class="nav-item"><a class="nav-link" href="{% url 'cours:index' %}">Cours</a></li>
-                <li class="nav-item"><a class="nav-link" href="{% url 'plandeclasse:index' %}">Plan de classe</a></li>
-                <li class="nav-item"><a class="nav-link" href="{% url 'pages:about' %}">À propos</a></li>
-                <li class="nav-item"><a class="nav-link" href="{% url 'pages:privacy' %}">Vie privée</a></li>
-                <li class="nav-item"><a class="nav-link" href="{% url 'pages:initiatives' %}">Initiatives numériques européennes</a></li>
+        <ul class="navbar-nav ms-auto">
+            <li class="nav-item"><a class="nav-link" href="{% url 'pages:home' %}">Accueil</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'cours:index' %}">Cours</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'plandeclasse:index' %}">Plan de classe</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'pages:initiatives' %}">Initiatives numériques européennes</a>
+            </li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'pages:about' %}">À&nbsp;propos</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'pages:privacy' %}">Vie privée &amp; confidentialité</a>
+            </li>
+        </ul>
 
-            </ul>
-        </div>
     </div>
 </nav>
 

@@ -42,7 +42,7 @@
                             algorithmique…</p>
 
                         <a class="btn btn-outline-secondary"
-                           href="{% url 'cours:year_level' year=cur_year level='NSI_1e' %}">Voir les ressources</a>
+                           href="{% url 'cours:year_level' year=cur_year level='NSI_1e' %}">Voir les ressources {{ cur_year }}</a>
                     </div>
                 </div>
             </div>
@@ -52,7 +52,7 @@
                         <h3 class="h5">NSI Terminale</h3>
                         <p class="text-muted mb-3">Structures de données, graphes, BD/SQL, réseaux, récursivité…</p>
                         <a class="btn btn-outline-secondary"
-                           href="{% url 'cours:year_level' year=cur_year level='NSI_Tle' %}">Voir les ressources</a>
+                           href="{% url 'cours:year_level' year=cur_year level='NSI_Tle' %}">Voir les ressources {{ cur_year }}</a>
                     </div>
                 </div>
             </div>
@@ -63,21 +63,9 @@
                         <p class="text-muted mb-3">Web, données, Internet, images numériques&nbsp;: documents et
                             activités.</p>
                         <a class="btn btn-outline-secondary"
-                           href="{% url 'cours:year_level' year=cur_year level='SNT' %}">Voir les ressources</a>
+                           href="{% url 'cours:year_level' year=cur_year level='SNT' %}">Voir les ressources {{ cur_year }}</a>
                     </div>
                 </div>
-            </div>
-        </div>
-
-        <!-- Bandeau collègues -->
-        <div class="mt-5 p-4 p-md-5 rounded-4 border bg-body-tertiary">
-            <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3">
-                <div>
-                    <h2 class="h4 mb-1">Outil «&nbsp;Plan de classe&nbsp;»</h2>
-                    <p class="mb-0 text-muted">Préparez vos salles rapidement, exportez et ajustez séance par
-                        séance.</p>
-                </div>
-                <a class="btn btn-primary btn-lg" href="/plandeclasse/">Ouvrir l’outil</a>
             </div>
         </div>
     </div>
