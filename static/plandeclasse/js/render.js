@@ -7,7 +7,7 @@
  */
 
 import {state} from "./state.js";
-import {$, buildDisplayMaps} from "./utils.js";
+import {$, buildDisplayMaps, compareByLastThenFirst, norm} from "./utils.js";
 
 /* ==========================================================================
    Dimensions & compaction
@@ -374,28 +374,33 @@ export function renderStudents() {
     const search = /** @type {HTMLInputElement|null} */ ($("#studentSearch"));
     if (!unplaced || !placed) return;
 
-    const q = (search?.value || "").toLowerCase();
+    const q = norm(search?.value || "");
     unplaced.innerHTML = "";
     placed.innerHTML = "";
 
-    const items = state.students.slice().sort((a, b) => {
-        const aKey = (a.first + " " + a.last).toLowerCase();
-        const bKey = (b.first + " " + b.last).toLowerCase();
-        return aKey.localeCompare(bKey);
-    });
+// Tri : NOM puis prénom (collator FR)
+    const items = [...state.students].sort(compareByLastThenFirst);
 
     for (const st of items) {
-        if (q && !(st.first + " " + st.last).toLowerCase().includes(q)) continue;
+        // Recherche tolérante : nom, prénom, "prénom nom" ou "nom prénom"
+        const f = norm(st.first);
+        const l = norm(st.last);
+        const fl = (f + " " + l).trim();
+        const lf = (l + " " + f).trim();
+
+        if (q && !(fl.includes(q) || lf.includes(q) || f.includes(q) || l.includes(q))) {
+            continue;
+        }
 
         const card = document.createElement("div");
         card.className = "student" + (state.selection.studentId === st.id ? " selected" : "");
         card.dataset.sid = String(st.id);
         card.innerHTML = `
-      <div class="d-flex flex-column">
-        <span class="student-name">${st.first}</span>
-        <span class="student-sub">${st.last}</span>
-      </div>
-    `;
+    <div class="d-flex flex-column">
+      <span class="student-name">${st.first}</span>
+      <span class="student-sub">${st.last}</span>
+    </div>
+  `;
 
         card.addEventListener("click", () => {
             if (state.selection.studentId === st.id) {

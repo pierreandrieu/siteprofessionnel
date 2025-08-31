@@ -89,3 +89,19 @@ export function computeMaxManhattan(schema /**: number[][] */) /**: number */ {
     const maxCols = Math.max(...schema.map((r) => r.length));
     return (rows - 1) + (maxCols - 1);
 }
+
+export const frNameCollator = new Intl.Collator('fr', {sensitivity: 'base', ignorePunctuation: true});
+
+export function compareByLastThenFirst(a, b) {
+    const c1 = frNameCollator.compare((a.last || '').trim(), (b.last || '').trim());
+    return c1 !== 0 ? c1 : frNameCollator.compare((a.first || '').trim(), (b.first || '').trim());
+}
+
+export function norm(str) {
+    return String(str || "")
+        .normalize("NFD")
+        .replace(/\p{Diacritic}/gu, "")      // enlève les accents
+        .toLowerCase()
+        .replace(/[-'’.\s]+/g, " ")          // compacte ponctuation/espaces
+        .trim();
+}

@@ -6,24 +6,37 @@
  */
 
 import {state} from "./state.js";
-import {$, computeMaxManhattan, keyOf} from "./utils.js";
+import {$, compareByLastThenFirst, computeMaxManhattan, keyOf} from "./utils.js";
 import {renderRoom, renderStudents, updateBanButtonLabel} from "./render.js";
+
 
 export function refreshConstraintSelectors() {
     const a = /** @type {HTMLSelectElement|null} */ ($("#cstStudentA"));
     const b = /** @type {HTMLSelectElement|null} */ ($("#cstStudentB"));
     if (!a || !b) return;
-    const fill = (sel) => {
+
+    const prevA = a.value;
+    const prevB = b.value;
+
+    const studentsSorted = [...state.students].sort(compareByLastThenFirst);
+
+    const fill = (sel, prevValue) => {
         sel.innerHTML = "";
-        for (const st of state.students.slice().sort((x, y) => (x.first + x.last).localeCompare(y.first + y.last))) {
+        for (const st of studentsSorted) {
             const opt = document.createElement("option");
             opt.value = String(st.id);
-            opt.textContent = `${st.first} ${st.last}`.trim();
+            opt.textContent = `${st.first} ${st.last}`.trim(); // affichage inchangé
             sel.appendChild(opt);
         }
+        if (prevValue && [...sel.options].some(o => o.value === prevValue)) {
+            sel.value = prevValue;
+        } else {
+            sel.selectedIndex = 0;
+        }
     };
-    fill(a);
-    fill(b);
+
+    fill(a, prevA);
+    fill(b, prevB);
 }
 
 export function onConstraintTypeChange() {

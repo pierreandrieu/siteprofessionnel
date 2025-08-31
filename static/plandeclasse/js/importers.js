@@ -211,7 +211,7 @@ export function setupUnifiedImport() {
             alert("Impossible de lire ce fichier. Vérifiez le format (CSV ou JSON).");
         } finally {
             // Permet de re-sélectionner le même fichier derrière
-            input.value = "";
+           // input.value = "";
         }
     });
 }
