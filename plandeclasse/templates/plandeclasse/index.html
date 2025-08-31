@@ -9,10 +9,16 @@
 {% block content %}
     <div id="pc-root" class="container-fluid py-3">
         <h1 class="h4 mb-3">Outil de génération de plan de classe sous contraintes</h1>
-        <div class="row g-3 align-items-stretch">
 
-            <!-- ====== Carte 1 : Données élèves (CSV) ====== -->
-            <!-- ====== Carte 1 : Données élèves (CSV ou JSON d’export) ====== -->
+        <!-- ===== Étape 1 ===== -->
+        <div class="bg-light border rounded px-3 py-2 my-3 d-flex align-items-center">
+            <span class="badge text-bg-primary me-2">Étape 1</span>
+            <strong>chargement des données élèves</strong>
+            <span id="step1Status" class="badge text-bg-secondary ms-auto">à faire</span>
+        </div>
+
+        <div class="row g-3">
+            <!-- Données élèves (CSV / JSON) -->
             <div class="col-12">
                 <div class="card shadow-sm">
                     <div class="card-header py-2">
@@ -22,6 +28,7 @@
                         <div class="row g-3 align-items-start">
                             <div class="col-12 col-sm-7 col-md-6 col-lg-5">
                                 <input id="csvInput" class="form-control w-100" type="file" accept=".csv,.json">
+                                <div id="csvFilename" class="form-text mt-1 text-truncate">Aucun fichier</div>
                             </div>
 
                             <div class="col">
@@ -31,95 +38,169 @@
                                         <li>
                                             <strong>CSV Pronote</strong> : <em>Mes données → Liste des élèves</em> →
                                             choisir la classe → cliquer
-                                            sur « copier la liste (format CSV) » puis sélectionner le fichier ici.
+                                            sur « copier la liste (format CSV) » puis sélectionner le fichier ici dont
+                                            l'icône est
+                                            <div class="d-none d-sm-inline-block">
+                                                <img src="{% static 'bouton_export_csv.png' %}"
+                                                     alt="bouton export CSV pronote"
+                                                     style="height:50px;opacity:.9">
+                                            </div>
                                         </li>
                                         <li>
-                                            <strong>JSON d’export</strong> : sélectionnez un fichier précédemment
-                                            exporté depuis cet outil
-                                            (contient élèves, placements, contraintes, schéma, etc.).
+                                            <strong>JSON plandeclasse</strong> : sélectionnez le fichier
+                                            <code>.json</code> précédemment exporté
+                                            depuis cet outil
                                         </li>
                                     </ul>
-                                    <div class="d-none d-sm-inline-block">
-                                        <img src="{% static 'bouton_export_csv.png' %}" alt="bouton export CSV pronote"
-                                             style="height:50px;opacity:.9">
-                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        </div> <!-- /row -->
                     </div>
                 </div>
             </div>
+        </div>
 
+        <!-- ===== Étape 2 ===== -->
+        <div class="bg-light border rounded px-3 py-2 my-3 d-flex align-items-center">
+            <span class="badge text-bg-primary me-2">Étape 2</span>
+            <strong>donner la disposition de la salle</strong>
+            <span id="step2Status" class="badge text-bg-secondary ms-auto">à faire</span>
+        </div>
 
-            <!-- ====== Carte 2 : Liste des élèves ====== -->
+        <div class="row g-3">
+            <!-- Configuration de la salle (séparée) -->
             <div class="col-12">
-                <div class="card shadow-sm students-card">
-                    <div class="card-header py-2 d-flex justify-content-between align-items-center">
-                        <strong>liste des élèves</strong>
-                        <div class="d-flex align-items-center gap-2">
-                            <input id="studentSearch" class="form-control form-control-sm" placeholder="rechercher…"
-                                   style="max-width:220px;">
-                            <button id="toggleStudentsPanel" class="btn btn-sm btn-outline-secondary"
-                                    title="masquer/afficher la liste">↕
-                            </button>
-                        </div>
+                <div class="card shadow-sm">
+                    <div class="card-header py-2">
+                        <strong>configuration de la salle</strong>
                     </div>
                     <div class="card-body">
-                        <div class="students-strip" aria-label="liste des élèves">
-                            <!-- rangée 'placés' -->
-                            <div class="students-strip-section">
-                                <div class="students-strip-title small text-muted mb-1">placés</div>
-                                <div id="studentsPlaced" class="students-scroll horizontal vstack gap-1 compact"
-                                     role="list"></div>
+                        <div class="row g-2 align-items-end">
+                            <!-- Col 1 : nombre de rangées (champ étroit) -->
+                            <div class="col-12 col-md-3 col-lg-2">
+                                <label class="form-label mb-1" for="rowsCount">nombre de rangées</label>
+                                <input id="rowsCount" type="number" min="1" max="20" value="5"
+                                       class="form-control w-auto" style="max-width:140px">
                             </div>
-                            <!-- rangée 'non placés' -->
-                            <div class="students-strip-section mt-2 pt-2 border-top">
-                                <div class="students-strip-title small text-muted mb-1">non placés</div>
-                                <div id="studentsUnplaced" class="students-scroll horizontal vstack gap-1 compact"
-                                     role="list"></div>
+
+                            <!-- Col 2 : capacités -->
+                            <div class="col-12 col-md-6 col-lg-7">
+                                <label class="form-label mb-1 d-inline-flex align-items-center gap-2"
+                                       for="rowCapacities">
+                                    capacités des tables d'une rangée (ex : 2,3,2)
+                                    <button type="button" class="btn btn-link p-0 lh-1 text-decoration-none"
+                                            data-bs-toggle="tooltip"
+                                            title="Ex. « 2,3,2 » : une rangée avec 3 tables de 2, 3 et 2 sièges.">?
+                                    </button>
+                                </label>
+                                <input id="rowCapacities" class="form-control" value="2,3,2">
+                            </div>
+
+                            <!-- Col 3 : boutons sur la même ligne -->
+                            <div class="col-12 col-md-3 col-lg-3 d-flex justify-content-md-end gap-2">
+                                <button id="btnBuildRoom" class="btn btn-primary">valider</button>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <!-- ====== Carte 3 : Plan de classe ====== -->
+        <!-- ===== Étape 3 ===== -->
+        <div class="bg-light border rounded px-3 py-2 my-3 d-flex align-items-center">
+            <span class="badge text-bg-primary me-2">Étape 3</span>
+            <strong>préremplissage manuel (facultatif)</strong>
+            <span id="step3Status" class="badge text-bg-secondary ms-auto">facultatif</span>
+        </div>
+
+        <div class="row g-3">
+            <!-- (optionnel) Carte placeholder si ton JS utilise .students-card -->
+            <div class="col-12">
+                <div class="card shadow-sm students-card"></div>
+            </div>
+
+            <!-- Plan de classe (manipulations + export) -->
             <div class="col-12">
                 <div class="card shadow-sm">
                     <div class="card-header py-2">
                         <strong>plan de classe</strong>
                     </div>
                     <div class="card-body">
-                        <!-- Schéma de salle -->
-                        <div class="row g-2 mb-2 align-items-end">
-                            <!-- Colonne 1 : rangées -->
-                            <div class="col-12 col-md-4 col-lg-3">
-                                <label class="form-label mb-1" for="rowsCount">nombre de rangées de la salle</label>
-                                <input id="rowsCount" type="number" min="1" max="20" value="5" class="form-control">
-                            </div>
 
-                            <!-- Colonne 2 : capacités par rangée  -->
-                            <div class="col-12 col-md-8 col-lg-9">
-                                <label class="form-label mb-1 d-inline-flex align-items-center gap-2"
-                                       for="rowCapacities">
-                                    capacités des tables d'une rangée (ex : 2,3,2)
-                                    <button type="button" class="btn btn-link p-0 lh-1 text-decoration-none"
-                                            data-bs-toggle="tooltip"
-                                            title="Ex. « 2,3,2 » : chaque rangée est constituée de 3 tables dont les capacités sont
-                                             respectivement 2, 3 et 2 sièges.">
-                                        ?
-                                    </button>
-                                </label>
-                                <input id="rowCapacities" class="form-control" value="2,3,2">
-                            </div>
-
-                            <!-- Boutons -->
-                            <div class="col-12 d-flex gap-2">
-                                <button id="btnBuildRoom" class="btn btn-primary">appliquer le schéma</button>
-                                <button id="btnClearRoom" class="btn btn-outline-secondary">réinitialiser</button>
+                        <!-- Bandeau liste des élèves -->
+                        <div class="card-header py-2 d-flex justify-content-between align-items-center">
+                            <strong>liste des élèves</strong>
+                            <div class="d-flex align-items-center gap-2">
+                                <input id="studentSearch" class="form-control form-control-sm"
+                                       placeholder="rechercher…" style="max-width:220px;">
+                                <button id="toggleStudentsPanel" class="btn btn-sm btn-outline-secondary"
+                                        title="masquer/afficher la liste">↕
+                                </button>
                             </div>
                         </div>
 
+                        <!-- Liste des élèves placés / non placés -->
+                        <div class="card-body">
+                            <div class="students-strip" aria-label="liste des élèves">
+                                <!-- rangée 'placés' -->
+                                <div class="students-strip-section">
+                                    <div class="students-strip-title small text-muted mb-1">placés</div>
+                                    <div id="studentsPlaced" class="students-scroll horizontal vstack gap-1 compact"
+                                         role="list"></div>
+                                </div>
+                                <!-- rangée 'non placés' -->
+                                <div class="students-strip-section mt-2 pt-2 border-top">
+                                    <div class="students-strip-title small text-muted mb-1">non placés</div>
+                                    <div id="studentsUnplaced" class="students-scroll horizontal vstack gap-1 compact"
+                                         role="list"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- SVG salle -->
+                        <div class="room-scroll mt-3">
+                            <svg id="roomCanvas" class="w-100"></svg>
+                        </div>
+
+                        <!-- Actions sièges -->
+                        <div class="d-flex gap-2 mt-3">
+                            <button id="btnToggleBan" class="btn btn-outline-secondary btn-sm">le siège doit rester
+                                vide
+                            </button>
+                            <button id="btnUnassign" class="btn btn-outline-secondary btn-sm">retirer l’élève</button>
+                        </div>
+
+                        <!-- Aide -->
+                        <p class="mt-3 mb-1 text-center">
+                            <a class="link-secondary small" data-bs-toggle="collapse" href="#pcHelp" role="button"
+                               aria-expanded="false" aria-controls="pcHelp">🛈 Comment ça fonctionne ?</a>
+                        </p>
+                        <div class="collapse" id="pcHelp">
+                            <div class="pc-help">
+                                <ul class="mb-2">
+                                    <li><strong>Sélectionner un élève :</strong> clic sur son nom OU sur la place qu’il
+                                        occupe (re-clic = désélection).
+                                    </li>
+                                    <li><strong>Sélectionner un siège :</strong> siège vide → sélection du siège (le
+                                        bouton
+                                        <em>« le siège doit rester vide »</em> s’active). Siège occupé → sélection de
+                                        l’élève assis.
+                                    </li>
+                                    <li><strong>Placer / déplacer :</strong> élève sélectionné → clic siège vide =
+                                        placer ; clic siège occupé = permuter.
+                                    </li>
+                                    <li><strong>Interdire un siège :</strong> sélectionner un siège vide → <em>« le
+                                        siège doit rester vide »</em> (re-clic = rendre dispo).
+                                    </li>
+                                    <li><strong>Retirer un élève :</strong> sélectionner le siège occupé → <em>« retirer
+                                        l’élève »</em>.
+                                    </li>
+                                </ul>
+                                <div class="small text-muted">Astuce : utilisez la recherche pour filtrer la liste
+                                    d’élèves.
+                                </div>
+                            </div>
+                        </div>
 
                         <!-- Affichage des noms -->
                         <div class="d-flex align-items-center gap-2 mt-3">
@@ -134,66 +215,7 @@
                             </div>
                         </div>
 
-                        <!-- SVG -->
-                        <div class="room-scroll mt-3">
-                            <svg id="roomCanvas" class="w-100"></svg>
-                        </div>
-
-                        <!-- Actions -->
-                        <div class="d-flex gap-2 mt-3">
-                            <button id="btnToggleBan" class="btn btn-outline-secondary btn-sm">le siège doit rester
-                                vide
-                            </button>
-                            <button id="btnUnassign" class="btn btn-outline-secondary btn-sm">retirer l’élève</button>
-                        </div>
-                        <p class="mt-3 mb-1 text-center">
-                            <a class="link-secondary small" data-bs-toggle="collapse" href="#pcHelp" role="button"
-                               aria-expanded="false" aria-controls="pcHelp">
-                                🛈 Comment ça fonctionne ?
-                            </a>
-                        </p>
-                        <div class="collapse" id="pcHelp">
-                            <div class="pc-help">
-                                <ul class="mb-2">
-                                    <li><strong>Sélectionner un élève :</strong> cliquez sur son nom dans la liste OU sur la place qu'il occupe. Re-clic
-                                        = désélection.
-                                    </li>
-                                    <li><strong>Sélectionner un siège :</strong>
-                                        <ul class="mb-2">
-                                            <li><em>Siège vide</em> → sélection du siège (le bouton <em>« le siège doit
-                                                rester vide »</em> s’active).
-                                            </li>
-                                            <li><em>Siège occupé</em> → sélection de l’élève assis à ce siège.</li>
-                                        </ul>
-                                    </li>
-                                    <li><strong>Placer / déplacer :</strong>
-                                        <ul class="mb-2">
-                                            <li>Élève sélectionné ➝ clic sur <em>siège vide</em> : l’élève est placé.
-                                            </li>
-                                            <li>Élève sélectionné ➝ clic sur <em>siège occupé</em> : les deux élèves
-                                                sont <em>permutés</em>.
-                                            </li>
-                                        </ul>
-                                    </li>
-                                    <li><strong>Interdire un siège :</strong> sélectionnez un <em>siège vide</em> puis
-                                        cliquez
-                                        <em>« le siège doit rester vide »</em> (re-clic = le rendre disponible).
-                                    </li>
-                                    <li><strong>Retirer un élève de son siège :</strong> sélectionnez le siège occupé
-                                        puis cliquez
-                                        <em>« retirer l’élève »</em>.
-                                    </li>
-                                    <li><strong>Affichage des noms :</strong> utilisez les boutons <em>prénom / nom /
-                                        prénom + nom</em>.
-                                    </li>
-                                </ul>
-                                <div class="small text-muted">Astuce : utilisez la recherche pour filtrer la liste
-                                    d’élèves.
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- ====== Export du plan (basé sur l'état courant) ====== -->
+                        <!-- Export -->
                         <div class="export-block mt-3">
                             <div class="row g-2 align-items-end">
                                 <div class="col-12 col-sm-6 col-md-4 col-lg-3">
@@ -202,26 +224,17 @@
                                            placeholder="ex : 2nde 3" aria-describedby="classNameHelp">
                                     <div class="invalid-feedback">Veuillez renseigner le nom de la classe.</div>
                                 </div>
-
                                 <div class="col-12 col-sm-auto">
                                     <label class="form-label invisible d-none d-sm-block">actions</label>
-
-                                    <!-- Wrapper pour tooltip même si le bouton est disabled -->
-                                    <span id="exportBtnWrap"
-                                          class="d-inline-block"
-                                          tabindex="0"
-                                          data-bs-toggle="tooltip"
-                                          data-bs-placement="top"
-                                          data-bs-trigger="hover focus"
+                                    <span id="exportBtnWrap" class="d-inline-block" tabindex="0"
+                                          data-bs-toggle="tooltip" data-bs-placement="top" data-bs-trigger="hover focus"
                                           title="Renseignez un nom de classe pour activer l’export">
-        <button id="btnExport" type="button" class="btn btn-outline-primary" disabled>
-          exporter le plan (PNG, PDF, JSON)
-        </button>
-      </span>
+                  <button id="btnExport" type="button" class="btn btn-outline-primary" disabled>
+                    exporter le plan (PNG, PDF, JSON)
+                  </button>
+                </span>
                                 </div>
                             </div>
-
-                            <!-- Liens d’export -->
                             <div id="exportDownloads" class="mt-2 d-none d-flex justify-content-center gap-2 flex-wrap">
                                 <a id="exPNG" class="btn btn-sm btn-outline-secondary" href="#" target="_blank">PNG</a>
                                 <a id="exPDF" class="btn btn-sm btn-outline-secondary" href="#" target="_blank">PDF</a>
@@ -232,26 +245,28 @@
                             </div>
                         </div>
 
-
                     </div>
                 </div>
             </div>
         </div>
 
+        <!-- ===== Étape 4 ===== -->
+        <div class="bg-light border rounded px-3 py-2 my-3 d-flex align-items-center">
+            <span class="badge text-bg-primary me-2">Étape 4</span>
+            <strong>saisie des contraintes (facultatif)</strong>
+            <span id="step4Status" class="badge text-bg-secondary ms-auto">facultatif</span>
+        </div>
 
-        <!-- =================== Constraints (full width) =================== -->
+        <!-- Contraintes -->
         <div class="row g-3 mt-3">
             <div class="col-12">
                 <div class="card-body constraints-body">
-
-                    <!-- ====== Formulaire de création de contrainte ====== -->
                     <div class="constraints-form">
                         <div class="row g-2 align-items-end">
                             <div class="col-12 col-md-4 col-lg-3">
                                 <label class="form-label">élève A</label>
                                 <select class="form-select cst-select" id="cstStudentA"></select>
                             </div>
-
                             <div class="col-12 col-md-4 col-lg-3">
                                 <label class="form-label">type de contrainte</label>
                                 <select class="form-select" id="constraintType">
@@ -263,12 +278,10 @@
                                     <option value="far_apart">distance d'au moins 'd' avec l'élève</option>
                                 </select>
                             </div>
-
                             <div class="col-12 col-md-4 col-lg-3" id="cstStudentBWrap" hidden>
                                 <label class="form-label">Élève B</label>
                                 <select class="form-select cst-select" id="cstStudentB"></select>
                             </div>
-
                             <div class="col-12 col-md-4 col-lg-3" id="cstParamWrap" hidden>
                                 <label class="form-label" id="cstParamLabel">Paramètre</label>
                                 <input id="cstParam" type="number" min="1"
@@ -276,8 +289,6 @@
                                        inputmode="numeric" placeholder="">
                                 <div class="form-text" id="cstParamHelp"></div>
                             </div>
-
-                            <!-- Bouton “ajouter contrainte” aligné à droite du row -->
                             <div class="col-12 col-md-auto ms-md-auto">
                                 <label class="form-label invisible d-none d-md-block">Actions</label>
                                 <div class="text-end">
@@ -300,31 +311,24 @@
                         </div>
 
                         <div class="d-flex align-items-center justify-content-center gap-2 mt-3">
-                            <!-- Wrapper pour tooltip (le bouton disabled ne reçoit pas les événements) -->
-                            <span id="solveBtnWrap"
-                                  class="d-inline-block"
-                                  tabindex="0"
-                                  data-bs-toggle="tooltip"
-                                  data-bs-placement="top"
-                                  data-bs-trigger="hover focus"
-                                  title="Chargez un CSV d’élèves et appliquez un schéma de salle pour lancer le calcul">
-    <button id="btnSolve" class="btn btn-success" type="button" disabled>
-      générer le plan de classe avec les contraintes ci-dessous
-    </button>
-  </span>
+            <span id="solveBtnWrap" class="d-inline-block" tabindex="0"
+                  data-bs-toggle="tooltip" data-bs-placement="top" data-bs-trigger="hover focus"
+                  title="Chargez un CSV d’élèves et appliquez un schéma de salle pour lancer le calcul">
+              <button id="btnSolve" class="btn btn-success" type="button" disabled>
+                générer le plan de classe avec les contraintes ci-dessous
+              </button>
+                <button id="btnClearRoom" class="btn btn-outline-secondary">réinitialiser la salle </button>
+            </span>
                             <div id="solveStatus" class="small text-muted"></div>
                         </div>
-
                     </div>
 
                     <hr class="my-3">
 
-                    <!-- ====== Liste des contraintes validées (en bas, scrollable) ====== -->
                     <div class="constraints-list">
                         <div id="constraintsList"></div>
                     </div>
                 </div>
-
             </div>
         </div>
     </div>
@@ -332,4 +336,5 @@
 
 {% block extra_js %}
     <script type="module" src="{% static 'plandeclasse/js/plandeclasse.js' %}"></script>
+    <script src="{% static 'plandeclasse/js/ui-steps.js' %}"></script>
 {% endblock %}
