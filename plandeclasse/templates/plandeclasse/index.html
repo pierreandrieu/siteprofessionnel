@@ -107,11 +107,42 @@
         </div>
 
         <!-- ===== Étape 3 ===== -->
-        <div class="bg-light border rounded px-3 py-2 my-3 d-flex align-items-center">
+        <div class="bg-light border rounded px-3 py-2 my-3 d-flex align-items-center flex-wrap gap-2">
             <span class="badge text-bg-primary me-2">Étape 3</span>
             <strong>préremplissage manuel (facultatif)</strong>
             <span id="step3Status" class="badge text-bg-secondary ms-auto">facultatif</span>
+
+            <!-- forcer le retour à la ligne -->
+            <div class="w-100"></div>
+
+            <!-- Lien d’aide + panneau en dessous -->
+            <a class="link-secondary small" data-bs-toggle="collapse" href="#pcHelpStep3" role="button"
+               aria-expanded="false" aria-controls="pcHelpStep3">🛈 Comment ça fonctionne ?</a>
+
+            <div class="collapse w-100 mt-2" id="pcHelpStep3">
+                <div class="pc-help small">
+                    <ul class="mb-2">
+                        <li><strong>Sélectionner un élève :</strong> clic sur son nom OU sur la place qu’il occupe
+                            (re-clic = désélection).
+                        </li>
+                        <li><strong>Sélectionner un siège :</strong> siège vide → sélection du siège (le bouton <em>« le
+                            siège doit rester vide »</em> s’active). Siège occupé → sélection de l’élève assis.
+                        </li>
+                        <li><strong>Placer / déplacer :</strong> élève sélectionné → clic siège vide = placer ; clic
+                            siège occupé = permuter.
+                        </li>
+                        <li><strong>Interdire un siège :</strong> sélectionner un siège vide → <em>« le siège doit
+                            rester vide »</em> (re-clic = rendre dispo).
+                        </li>
+                        <li><strong>Retirer un élève :</strong> sélectionner le siège occupé → <em>« retirer l’élève
+                            »</em>.
+                        </li>
+                    </ul>
+                    <div class="text-muted">Astuce : utilisez la recherche pour filtrer la liste d’élèves.</div>
+                </div>
+            </div>
         </div>
+
 
         <div class="row g-3">
             <!-- (optionnel) Carte placeholder si ton JS utilise .students-card -->
@@ -170,38 +201,6 @@
                             <button id="btnUnassign" class="btn btn-outline-secondary btn-sm">retirer l’élève</button>
                         </div>
 
-                        <!-- Aide -->
-                        <p class="mt-3 mb-1 text-center">
-                            <a class="link-secondary small" data-bs-toggle="collapse" href="#pcHelp" role="button"
-                               aria-expanded="false" aria-controls="pcHelp">🛈 Comment ça fonctionne ?</a>
-                        </p>
-                        <div class="collapse" id="pcHelp">
-                            <div class="pc-help">
-                                <ul class="mb-2">
-                                    <li><strong>Sélectionner un élève :</strong> clic sur son nom OU sur la place qu’il
-                                        occupe (re-clic = désélection).
-                                    </li>
-                                    <li><strong>Sélectionner un siège :</strong> siège vide → sélection du siège (le
-                                        bouton
-                                        <em>« le siège doit rester vide »</em> s’active). Siège occupé → sélection de
-                                        l’élève assis.
-                                    </li>
-                                    <li><strong>Placer / déplacer :</strong> élève sélectionné → clic siège vide =
-                                        placer ; clic siège occupé = permuter.
-                                    </li>
-                                    <li><strong>Interdire un siège :</strong> sélectionner un siège vide → <em>« le
-                                        siège doit rester vide »</em> (re-clic = rendre dispo).
-                                    </li>
-                                    <li><strong>Retirer un élève :</strong> sélectionner le siège occupé → <em>« retirer
-                                        l’élève »</em>.
-                                    </li>
-                                </ul>
-                                <div class="small text-muted">Astuce : utilisez la recherche pour filtrer la liste
-                                    d’élèves.
-                                </div>
-                            </div>
-                        </div>
-
                         <!-- Affichage des noms -->
                         <div class="d-flex align-items-center gap-2 mt-3">
                             <span class="me-2">affichage des noms</span>
@@ -221,7 +220,7 @@
                                 <div class="col-12 col-sm-6 col-md-4 col-lg-3">
                                     <label for="className" class="form-label mb-1">Nom de la classe</label>
                                     <input id="className" class="form-control form-control-sm" required
-                                           placeholder="ex : 2nde 3" aria-describedby="classNameHelp">
+                                           placeholder="ex : TGA" aria-describedby="classNameHelp">
                                     <div class="invalid-feedback">Veuillez renseigner le nom de la classe.</div>
                                 </div>
                                 <div class="col-12 col-sm-auto">
