@@ -133,21 +133,26 @@ LOGGING = {
     },
 }
 
-# --- Redis / Celery ---
-CELERY_BROKER_URL = "redis://localhost:6379/0"
-CELERY_RESULT_BACKEND = "redis://localhost:6379/1"
-CELERY_TASK_SERIALIZER = "json"
+# --- Celery / Redis paramétrables ---
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
+CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/1")
+CELERY_TASK_ALWAYS_EAGER = os.getenv("CELERY_TASK_ALWAYS_EAGER", "0") == "1"
 CELERY_ACCEPT_CONTENT = ["json"]
-CELERY_RESULT_EXPIRES = 3600  # 1h
-CELERY_TASK_TIME_LIMIT = 600  # 10 min
-CELERY_TASK_SOFT_TIME_LIMIT = 500
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_RESULT_EXPIRES = int(os.getenv("CELERY_RESULT_EXPIRES", "3600"))
+CELERY_TASK_TIME_LIMIT = int(os.getenv("CELERY_TASK_TIME_LIMIT", "600"))
+CELERY_TASK_SOFT_TIME_LIMIT = int(os.getenv("CELERY_TASK_SOFT_TIME_LIMIT", "500"))
+CELERY_TIMEZONE = "Europe/Paris"
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
-# Cache sur Redis (pour stocker les artefacts binaires, pas de DB)
+# --- Cache (Redis par défaut, configurable) ---
+CACHE_URL = os.getenv("DJANGO_CACHE_URL", "redis://localhost:6379/2")
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": "redis://localhost:6379/2",
+        "LOCATION": CACHE_URL,
         "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
-        "TIMEOUT": 3600,  # 1h
+        "TIMEOUT": int(os.getenv("DJANGO_CACHE_TIMEOUT", "3600")),
     }
 }
