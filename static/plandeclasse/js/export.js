@@ -2,31 +2,38 @@
 "use strict";
 
 /**
- * Export du plan basé sur l'état courant (après ajustements manuels).
- * - Capture l’SVG rendu (#roomCanvas), y injecte un <style> autonome,
- * - Sérialise l’état (élèves, contraintes, placements…),
- * - Envoie au backend /plandeclasse/export pour fabriquer PNG/PDF/SVG/JSON/ZIP,
- * - Met à jour les liens d’export dans le DOM.
+ * Module Export — génération et envoi des artefacts d’export.
  *
- * UX :
- * - Le champ “Nom de la classe” est OBLIGATOIRE (bouton désactivé tant que vide).
- * - Feedback Bootstrap : .is-invalid si on tente d’exporter sans nom.
+ * Fonctions clés :
+ * - buildExportPayload() : construit le payload complet à envoyer au backend,
+ *   en incluant deux SVG : vue élève et vue prof.
+ * - startExport() : envoie le payload au backend /plandeclasse/export,
+ *   récupère les URLs et met à jour les liens de téléchargement dans l’IHM.
+ * - setupExportUI() / syncExportButtonEnabled() : gestion fine du bouton
+ *   d’export (champ nom de classe requis + tooltip explicatif).
+ *
+ * Notes d’implémentation :
+ * - La **vue prof** est réalisée en appliquant un **miroir vertical global**
+ *   (translate + scaleY négatif) puis, pour chaque <text>, une inversion locale
+ *   (scaleY négatif) et un ajustement de y (y := -y0) pour conserver un texte
+ *   lisible tout en maintenant la position “miroir”.
+ * - Le code est rétro-compatible avec l’ancien backend qui ne renvoyait qu’une
+ *   seule vue. Dans ce cas, seuls les liens “vue élève” sont affichés.
  */
 
 import {state} from "./state.js";
 import {$} from "./utils.js";
 
 /* ==========================================================================
-   Helpers internes
+   Feuille de style embarquée et outils SVG
    ========================================================================== */
 
 /**
- * Feuille de style minimale embarquée dans l’SVG exporté.
- * On reprend les classes utilisées par le rendu pour garantir un WYSIWYG.
+ * Retourne la feuille de styles minimale injectée dans les SVG exportés.
+ * Garder la cohérence avec plandeclasse.css si vous modifiez les couleurs.
  * @returns {string}
  */
 function svgInlineStyles() {
-    // NB : si vous changez les couleurs dans plandeclasse.css, gardez la cohérence ici.
     return `
 .board-rect{fill:#1f2937;stroke:#111827;stroke-width:1.5}
 .board-label{fill:#994444;font-weight:600;letter-spacing:.02em;font-size:12px}
@@ -42,15 +49,19 @@ function svgInlineStyles() {
 }
 
 /**
- * Clone l’SVG affiché (#roomCanvas), y injecte un <style> et garantit width/height.
- * @returns {string|null} SVG XML complet prêt pour export, ou null si rien à exporter.
+ * Prépare un clone du #roomCanvas pour l’export :
+ * - copie l’SVG affiché,
+ * - force xmlns,
+ * - force width/height d’après viewBox,
+ * - injecte <style> et un fond blanc couvrant (évite la transparence côté PNG).
+ *
+ * @param {SVGSVGElement} svgEl - l’élément SVG source (#roomCanvas)
+ * @returns {SVGSVGElement} - le clone prêt à être sérialisé
  */
-function collectRoomSvgMarkup() {
-    const svgEl = document.getElementById("roomCanvas");
-    if (!(svgEl instanceof SVGSVGElement)) return null;
-
+function prepareSvgClone(svgEl) {
     const clone = /** @type {SVGSVGElement} */ (svgEl.cloneNode(true));
 
+    // Namespace + dimensionnement à partir du viewBox
     clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
     const vbAttr = clone.getAttribute("viewBox");
     if (vbAttr) {
@@ -67,46 +78,120 @@ function collectRoomSvgMarkup() {
     styleEl.textContent = svgInlineStyles();
     clone.insertBefore(styleEl, clone.firstChild);
 
-    // ✅ Fond blanc couvrant tout l'area (évite le damier sur SVG/PNG)
+    // Fond blanc couvrant (évite les checkerboards à l’export)
     const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
     bg.setAttribute("x", "0");
     bg.setAttribute("y", "0");
     bg.setAttribute("width", "100%");
     bg.setAttribute("height", "100%");
     bg.setAttribute("fill", "#ffffff");
-    // on l’insère juste après <style>, pour qu’il soit peint en premier
     clone.insertBefore(bg, styleEl.nextSibling);
 
-    const xml = new XMLSerializer().serializeToString(clone);
+    return clone;
+}
+
+/**
+ * Sérialise un SVG DOM en XML, avec l’en-tête XML standard.
+ * @param {SVGSVGElement} svg - l’élément SVG à sérialiser
+ * @returns {string} - XML SVG complet prêt pour l’export
+ */
+function serializeSvg(svg) {
+    const xml = new XMLSerializer().serializeToString(svg);
     return `<?xml version="1.0" encoding="UTF-8"?>\n${xml}`;
 }
 
-/**
- * Renseigne (ou masque) un lien de téléchargement selon l’URL fournie.
- * @param {HTMLAnchorElement|null} a
- * @param {string|undefined} url
- */
-function setDownloadLink(a, url) {
-    if (!a) return;
-    if (url) {
-        a.href = url;
-        a.classList.remove("d-none");
-    } else {
-        a.href = "#";
-        a.classList.add("d-none");
-    }
-}
-
 /* ==========================================================================
-   API publique du module
+   Collecte des deux variantes de SVG (élève / prof)
    ========================================================================== */
 
 /**
- * Construit le payload d’export avec :
- * - nom de la classe (OBLIGATOIRE),
- * - SVG autonome (ce qui est réellement visible),
- * - état courant (élèves, contraintes, placements…).
- * @returns {object}
+ * Produit le SVG “vue élève” : identique à l’affichage à l’écran.
+ * @returns {string|null} - XML SVG ou null si le canvas est indisponible
+ */
+function collectRoomSvgMarkupStudent() {
+    const svgEl = document.getElementById("roomCanvas");
+    if (!(svgEl instanceof SVGSVGElement)) return null;
+    const clone = prepareSvgClone(svgEl);
+    return serializeSvg(clone);
+}
+
+/**
+ * Produit le SVG “vue prof” : miroir vertical, **textes lisibles**.
+ *
+ * Méthode :
+ * 1. On regroupe le contenu (hors <style> et fond blanc) dans <g transform="translate(0,H) scale(1,-1)">.
+ * 2. Pour chaque <text>, on applique localement `scale(1,-1)` ET on remplace `y` par `-y`.
+ *    - Le miroir global retourne toute la scène verticalement.
+ *    - L’inversion locale remet le texte “à l’endroit”.
+ *    - Le `y := -y0` garantit la bonne position finale (miroir parfait).
+ *
+ * @returns {string|null} - XML SVG ou null si le canvas est indisponible
+ */
+function collectRoomSvgMarkupTeacher() {
+    const svgEl = document.getElementById("roomCanvas");
+    if (!(svgEl instanceof SVGSVGElement)) return null;
+
+    const clone = prepareSvgClone(svgEl);
+
+    // Hauteur nécessaire au calcul du miroir
+    const H = Number(clone.getAttribute("height") || "0");
+    if (!Number.isFinite(H) || H <= 0) {
+        // Fallback : si la hauteur vaut 0, on renvoie un clone non transformé.
+        return serializeSvg(clone);
+    }
+
+    const ns = "http://www.w3.org/2000/svg";
+    const g = document.createElementNS(ns, "g");
+    g.setAttribute("transform", `translate(0, ${H}) scale(1, -1)`);
+
+    // Déplacer tout (sauf <style> et <rect width="100%" height="100%">) dans <g>
+    const children = Array.from(clone.childNodes);
+    for (let i = 0; i < children.length; i++) {
+        const n = children[i];
+        if (!(n instanceof Element)) continue;
+        const tag = n.tagName?.toLowerCase();
+        const isStyle = tag === "style";
+        const isBg =
+            tag === "rect" &&
+            n.getAttribute("width") === "100%" &&
+            n.getAttribute("height") === "100%";
+        if (isStyle || isBg) continue;
+        g.appendChild(n); // on déplace ce nœud dans le groupe miroir
+    }
+    clone.appendChild(g);
+
+    // Pour chaque <text> : remet l’orientation des glyphes et ajuste la position.
+    const texts = g.querySelectorAll("text");
+    texts.forEach((t) => {
+        const yAttr = t.getAttribute("y");
+        if (!yAttr) return; // prudence : si pas de y (peu probable ici)
+
+        const y0 = Number(yAttr);
+        if (!Number.isFinite(y0)) return;
+
+        // y := -y0 (compensation de l’échelle négative locale)
+        t.setAttribute("y", String(-y0));
+
+        // Préserve d’éventuels transforms en ajoutant scale(1,-1) en tête
+        const prev = t.getAttribute("transform") || "";
+        t.setAttribute("transform", `scale(1,-1)${prev ? " " + prev : ""}`);
+    });
+
+    return serializeSvg(clone);
+}
+
+/* ==========================================================================
+   Construction du payload envoyé au backend
+   ========================================================================== */
+
+/**
+ * Construit le payload d’export :
+ * - nom de la classe (OBLIGATOIRE côté UI, mais inclus ici pour robustesse),
+ * - svg_markup_student : SVG autonome “vue élève”,
+ * - svg_markup_teacher : SVG autonome “vue prof” (miroir vertical, textes à l’endroit),
+ * - état courant (schéma, élèves, contraintes, options, etc.).
+ *
+ * @returns {object} - objet JSON sérialisable pour /plandeclasse/export
  */
 export function buildExportPayload() {
     const classInput = /** @type {HTMLInputElement|null} */ ($("#className"));
@@ -114,7 +199,8 @@ export function buildExportPayload() {
 
     return {
         class_name,
-        svg_markup: collectRoomSvgMarkup(), // ← l’SVG réel, autonome (avec <style>)
+        svg_markup_student: collectRoomSvgMarkupStudent(),
+        svg_markup_teacher: collectRoomSvgMarkupTeacher(),
         schema: state.schema,
         students: state.students.map((s) => ({
             id: s.id,
@@ -131,23 +217,53 @@ export function buildExportPayload() {
     };
 }
 
+/* ==========================================================================
+   Utilitaires UI
+   ========================================================================== */
+
 /**
- * Lance l’export via /plandeclasse/export et met à jour les liens d’export.
- * - Bloque si le nom de classe est vide (feedback .is-invalid).
- * - Tolérant aux absences d’éléments (le HTML peut évoluer).
+ * Renseigne (ou masque) un lien de téléchargement selon l’URL fournie.
+ * @param {HTMLAnchorElement|null} a - balise <a> ciblée (peut être null si l’IHM diffère)
+ * @param {string|undefined} url - URL de téléchargement (ou undefined/null pour masquer)
+ * @returns {void}
+ */
+function setDownloadLink(a, url) {
+    if (!a) return;
+    if (url) {
+        a.href = url;
+        a.classList.remove("d-none");
+    } else {
+        a.href = "#";
+        a.classList.add("d-none");
+    }
+}
+
+/* ==========================================================================
+   Export — envoi + mise à jour des liens
+   ========================================================================== */
+
+/**
+ * Démarre l’export :
+ * - Vérifie la présence du nom de classe,
+ * - Produit deux SVG (élève/prof),
+ * - Envoie l’état complet au backend,
+ * - Met à jour les **4 blocs** de liens :
+ *     • Vue élève  : PNG / PDF / SVG
+ *     • Vue prof   : PNG / PDF / SVG
+ *     • Sauvegarde : JSON
+ *     • Archive    : ZIP (contient tous les fichiers, y compris “vue prof” si backend à jour)
+ *
+ * Rétro-compatibilité :
+ * - Si le backend renvoie encore un “download” plat (sans .student / .teacher),
+ *   on remplit uniquement la “vue élève” (ancienne logique).
+ *
  * @returns {Promise<void>}
  */
 export async function startExport() {
     const btn = /** @type {HTMLButtonElement|null} */ ($("#btnExport"));
-    const block = /** @type {HTMLElement|null} */ ($("#exportDownloads"));
-    const exPNG = /** @type {HTMLAnchorElement|null} */ ($("#exPNG"));
-    const exPDF = /** @type {HTMLAnchorElement|null} */ ($("#exPDF"));
-    const exSVG = /** @type {HTMLAnchorElement|null} */ ($("#exSVG"));
-    const exJSON = /** @type {HTMLAnchorElement|null} */ ($("#exJSON"));
-    const exZIP = /** @type {HTMLAnchorElement|null} */ ($("#exZIP"));
     const classInput = /** @type {HTMLInputElement|null} */ ($("#className"));
 
-    // 0) Nom de classe obligatoire
+    // 0) Nom de classe obligatoire (ergonomie UI)
     const className = (classInput?.value || "").trim();
     if (!className) {
         classInput?.classList.add("is-invalid");
@@ -156,21 +272,20 @@ export async function startExport() {
     }
     classInput?.classList.remove("is-invalid");
 
-    // 1) Vérifie qu’on a bien un SVG à exporter
-    const svgTxt = collectRoomSvgMarkup();
+    // 1) Vérifie la présence d’un SVG à exporter (au moins la vue élève)
+    const svgTxt = collectRoomSvgMarkupStudent();
     if (!svgTxt) {
         alert("Aucun plan de classe à exporter pour le moment.");
         return;
     }
 
-    // 2) Construire le body après vérifications (évite double sérialisation de l’SVG)
+    // 2) Body JSON (deux vues incluses)
     const body = JSON.stringify({
         ...buildExportPayload(),
-        class_name: className, // assurance
-        svg_markup: svgTxt,
+        class_name: className, // redondance volontaire
     });
 
-    // 3) Feedback UI
+    // 3) Feedback UI (désactive le bouton pendant l’export)
     const prev = btn?.textContent || "";
     if (btn) {
         btn.disabled = true;
@@ -184,20 +299,50 @@ export async function startExport() {
             body,
         });
         if (!r.ok) {
-            // backend renvoie 400 si nom vide ; message générique si autre souci
+            // Backend renvoie {"error": "..."} en cas de pb (ex : nom vide côté serveur)
             const msg = (await r.json().catch(() => ({})))?.error || "export failed";
             throw new Error(msg);
         }
+
         const data = await r.json();
         const dl = data?.download || {};
 
-        // 4) Renseigner les liens disponibles
-        setDownloadLink(exPNG, dl.png);
-        setDownloadLink(exPDF, dl.pdf);
-        setDownloadLink(exSVG, dl.svg);
-        setDownloadLink(exJSON, dl.json);
-        setDownloadLink(exZIP, dl.zip);
+        // --- Sélecteurs IHM attendus pour les 4 blocs ---
+        const block = /** @type {HTMLElement|null} */ ($("#exportDownloads"));
 
+        // Vue élève
+        const sPNG = /** @type {HTMLAnchorElement|null} */ ($("#exS_PNG"));
+        const sPDF = /** @type {HTMLAnchorElement|null} */ ($("#exS_PDF"));
+        const sSVG = /** @type {HTMLAnchorElement|null} */ ($("#exS_SVG"));
+
+        // Vue prof
+        const tPNG = /** @type {HTMLAnchorElement|null} */ ($("#exT_PNG"));
+        const tPDF = /** @type {HTMLAnchorElement|null} */ ($("#exT_PDF"));
+        const tSVG = /** @type {HTMLAnchorElement|null} */ ($("#exT_SVG"));
+
+        // Sauvegarde + Archive
+        const exJSON = /** @type {HTMLAnchorElement|null} */ ($("#exJSON"));
+        const exZIP = /** @type {HTMLAnchorElement|null} */ ($("#exZIP"));
+
+        // --- Rétro-compat : si le backend renvoie une structure plate ---
+        // Ancien schéma : { png, pdf, svg, json, zip }
+        // Nouveau schéma : { student: {png,pdf,svg}, teacher: {png,pdf,svg}, json, zip }
+        const s = dl.student || dl;
+        const t = dl.teacher || {}; // si absent : on masquera la vue prof
+
+        // Renseigne les URLs
+        setDownloadLink(sPNG, s?.png);
+        setDownloadLink(sPDF, s?.pdf);
+        setDownloadLink(sSVG, s?.svg);
+
+        setDownloadLink(tPNG, t?.png);
+        setDownloadLink(tPDF, t?.pdf);
+        setDownloadLink(tSVG, t?.svg);
+
+        setDownloadLink(exJSON, dl?.json);
+        setDownloadLink(exZIP, dl?.zip);
+
+        // Affiche le bloc si au moins un lien est dispo
         block?.classList.remove("d-none");
     } catch (err) {
         console.error(err);
@@ -211,65 +356,18 @@ export async function startExport() {
 }
 
 /* ==========================================================================
-   Auto-wiring (optionnel) : désactivation/activation du bouton et binding sûr
+   Initialisation / ergonomie du bouton d’export
    ========================================================================== */
 
 /**
- * Prépare l’UI d’export :
- * - le champ “Nom de la classe” est requis,
- * - (ré)active le bouton si le champ n’est pas vide,
- * - enlève .is-invalid dès qu’on saisit quelque chose,
- * - câble le clic sur #btnExport (une seule fois),
- * - lance une synchronisation initiale (utile si le nom vient d’un import JSON).
+ * Active/désactive le bouton d’export en fonction du champ “Nom de la classe”.
+ * Initialise/entretient un tooltip explicatif tant que le bouton est inactif.
+ *
+ * Cette fonction est utilisée ailleurs (ex. importers.js) pour resynchroniser
+ * l’état du bouton lorsque le nom de classe est modifié par programme.
+ *
+ * @returns {void}
  */
-export function setupExportUI() {
-    /** @type {HTMLInputElement|null} */
-    const classInput = document.getElementById("className");
-    /** @type {HTMLButtonElement|null} */
-    const btn = document.getElementById("btnExport");
-
-    // Champ requis + synchronisation sur saisie/changement
-    if (classInput) {
-        classInput.required = true;
-
-        const onEdit = () => {
-            // Active/désactive le bouton + gère le tooltip wrapper
-            syncExportButtonEnabled();
-            // Enlève l’état invalide si l’utilisateur a commencé à saisir
-            if (classInput.value.trim().length > 0) {
-                classInput.classList.remove("is-invalid");
-            }
-        };
-
-        classInput.addEventListener("input", onEdit);
-        classInput.addEventListener("change", onEdit);
-    } else if (btn) {
-        // Pas de champ -> on laisse cliquable (fallback)
-        btn.disabled = false;
-    }
-
-    // Bind du bouton (une seule fois)
-    if (btn && !btn.dataset.wired) {
-        btn.dataset.wired = "1";
-        btn.addEventListener("click", (ev) => {
-            ev.preventDefault();
-            startExport();
-        });
-    }
-
-    // Sync initiale : prend en compte un nom pré-rempli (ex. import JSON)
-    syncExportButtonEnabled();
-}
-
-
-// Auto-init à l’ouverture de la page (sécurisé)
-if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => setupExportUI());
-} else {
-    setupExportUI();
-}
-
-/** Active/désactive le bouton d’export selon la présence d’un nom de classe. */
 export function syncExportButtonEnabled() {
     /** @type {HTMLButtonElement|null} */
     const btn = document.getElementById("btnExport");
@@ -282,13 +380,14 @@ export function syncExportButtonEnabled() {
     const hasName = !!input.value.trim();
     btn.disabled = !hasName;
 
-    // Tooltip explicatif tant que désactivé
+    // Tooltip explicatif tant que désactivé (Bootstrap 5)
     if (wrap && window.bootstrap?.Tooltip) {
         const tip = bootstrap.Tooltip.getOrCreateInstance(wrap, {
             trigger: "hover focus",
             placement: "top",
             title: wrap.getAttribute("title") || "Renseignez un nom de classe pour activer l’export",
         });
+
         if (!hasName) {
             if (typeof tip.setContent === "function") {
                 tip.setContent({".tooltip-inner": "Renseignez un nom de classe pour activer l’export"});
@@ -307,7 +406,8 @@ export function syncExportButtonEnabled() {
             wrap.classList.remove("pe-none");
             wrap.removeAttribute("title");
         }
-        // Clic sur wrapper quand désactivé → affiche brièvement l’aide
+
+        // Clic sur le wrapper quand désactivé → affiche brièvement l’aide
         if (!wrap.dataset.wired) {
             wrap.dataset.wired = "1";
             wrap.addEventListener("click", (ev) => {
@@ -327,4 +427,60 @@ export function syncExportButtonEnabled() {
             });
         }
     }
+}
+
+/**
+ * Prépare l’UI d’export (binding des événements + ergonomie du champ texte).
+ * - Le champ “Nom de la classe” est requis,
+ * - Le bouton est (ré)activé si le champ n’est pas vide,
+ * - L’état invalide du champ est enlevé dès qu’on saisit quelque chose,
+ * - Le clic sur #btnExport lance startExport().
+ *
+ * @returns {void}
+ */
+export function setupExportUI() {
+    /** @type {HTMLInputElement|null} */
+    const classInput = document.getElementById("className");
+    /** @type {HTMLButtonElement|null} */
+    const btn = document.getElementById("btnExport");
+
+    if (classInput) {
+        classInput.required = true;
+
+        const onEdit = () => {
+            // Synchro du bouton + nettoyage de l’état invalide
+            syncExportButtonEnabled();
+            if (classInput.value.trim().length > 0) {
+                classInput.classList.remove("is-invalid");
+            }
+        };
+
+        classInput.addEventListener("input", onEdit);
+        classInput.addEventListener("change", onEdit);
+    } else if (btn) {
+        // Pas de champ : laisse cliquable (fallback)
+        btn.disabled = false;
+    }
+
+    // Bind du bouton (une seule fois)
+    if (btn && !btn.dataset.wired) {
+        btn.dataset.wired = "1";
+        btn.addEventListener("click", (ev) => {
+            ev.preventDefault();
+            startExport();
+        });
+    }
+
+    // Sync initiale (utile si le nom est déjà pré-rempli via import JSON)
+    syncExportButtonEnabled();
+}
+
+/* ==========================================================================
+   Auto-init (sûr) : prépare l’UI à l’ouverture
+   ========================================================================== */
+
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => setupExportUI());
+} else {
+    setupExportUI();
 }

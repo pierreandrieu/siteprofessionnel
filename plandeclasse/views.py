@@ -169,6 +169,9 @@ class ExportInput(TypedDict, total=False):
     Entrée attendue côté export (alignée avec le front).
     """
     class_name: str
+    svg_markup_student: Optional[str]
+    svg_markup_teacher: Optional[str]
+
     svg_markup: Optional[str]
     schema: list[list[int]]
     students: list[dict[str, Any]]
@@ -301,6 +304,38 @@ def _svg_from_payload_or_placeholder(data: ExportInput, class_name: str) -> byte
     return svg.encode("utf-8")
 
 
+def _svg_pair_from_payload(data: ExportInput, class_name: str) -> Tuple[bytes, bytes]:
+    """
+    Construit le couple (SVG élève, SVG prof) à partir du payload.
+
+    Priorités :
+      1) Si le payload contient svg_markup_student et svg_markup_teacher, on les utilise.
+      2) Sinon, si svg_markup (ancien champ) est présent, on s'en sert comme vue élève
+         et on fabrique une "vue prof" fallback identique (même SVG).
+      3) Sinon, on fabrique deux placeholders identiques.
+
+    Tous les SVG sont passés dans _ensure_svg_background_white pour imposer un fond opaque.
+    """
+    # 1) Nouveau front : deux vues explicites
+    stu = data.get("svg_markup_student")
+    tea = data.get("svg_markup_teacher")
+    if isinstance(stu, str) and stu.strip() and isinstance(tea, str) and tea.strip():
+        return (
+            _ensure_svg_background_white(stu.encode("utf-8")),
+            _ensure_svg_background_white(tea.encode("utf-8")),
+        )
+
+    # 2) Ancien front : un seul SVG (utilisé pour élève + fallback prof)
+    legacy = data.get("svg_markup")
+    if isinstance(legacy, str) and legacy.strip():
+        b = _ensure_svg_background_white(legacy.encode("utf-8"))
+        return (b, b)
+
+    # 3) Pas de SVG du front : placeholders identiques
+    ph = _svg_from_payload_or_placeholder(data, class_name)
+    return (ph, ph)
+
+
 def _svg_to_png_pdf(svg_bytes: bytes) -> Tuple[Optional[bytes], Optional[bytes]]:
     """
     Convertit SVG -> PNG/PDF via CairoSVG (si installé).
@@ -367,119 +402,189 @@ def export_plan(request: HttpRequest) -> HttpResponse:
 
     Entrée (JSON) : ExportInput
       - class_name (obligatoire)
-      - svg_markup (SVG autonome, optionnel, sinon placeholder)
+      - svg_markup_student (SVG autonome “vue élève”, recommandé)
+      - svg_markup_teacher (SVG autonome “vue prof”, recommandé)
+      - (rétro-compat) svg_markup (unique)
       - schema, students, options, constraints, forbidden, placements, name_view
 
     Sortie (JSON) :
-      - {"status": "OK", "download": {"svg": "...", "png": "...", "pdf": "...", "json": "...", "txt": "...", "zip": "..."}}
-        Chaque valeur est une URL éphémère (cache) à appeler via download_artifact.
+      {
+        "status": "OK",
+        "download": {
+          "student": {"svg": "...", "png": "...", "pdf": "..."},
+          "teacher": {"svg": "...", "png": "...", "pdf": "..."},
+          "json": "...",
+          "zip": "..."
+        }
+      }
     """
     try:
         data: ExportInput = json.loads((request.body or b"{}").decode("utf-8"))
     except (json.JSONDecodeError, UnicodeDecodeError):
         return JsonResponse({"error": "JSON invalide"}, status=400)
 
-    raw_name = (data.get("class_name") or "").strip()
+    raw_name: str = (data.get("class_name") or "").strip()
     if not raw_name:
         return JsonResponse({"error": "nom de classe requis"}, status=400)
 
-    class_name = raw_name
-    slug = "plan_de_classe_"+_slugify_filename(class_name)
+    class_name: str = raw_name
+    slug: str = "plan_de_classe_" + _slugify_filename(class_name)
 
     # Code config (ex. "7r232") + date JJ-MM
     code, _meta = _schema_config(data.get("schema", []))
-    stamp = _day_month_stamp()
+    stamp: str = _day_month_stamp()
 
     # Préfixe de base : <classe>_config=<code>_<JJ-MM>
-    prefix = f"{slug}_config={code}_{stamp}"
+    prefix: str = f"{slug}_config={code}_{stamp}"
 
-    # 1) JSON
-    json_bytes = _build_export_json(data, class_name)
+    # 1) JSON ré-importable (inchangé)
+    json_bytes: bytes = _build_export_json(data, class_name)
 
-    # 2) SVG (front si dispo) + fond blanc assuré
-    svg_bytes = _svg_from_payload_or_placeholder(data, class_name)
+    # 2) SVG élève + prof (depuis le payload, avec fallback)
+    svg_student_bytes, svg_teacher_bytes = _svg_pair_from_payload(data, class_name)
 
-    # 3) PNG/PDF
-    png_bytes, pdf_bytes = _svg_to_png_pdf(svg_bytes)
+    # 3) PNG/PDF pour les deux vues (si CairoSVG dispo)
+    s_png, s_pdf = _svg_to_png_pdf(svg_student_bytes)
+    t_png, t_pdf = _svg_to_png_pdf(svg_teacher_bytes)
 
-    # 4) TXT (contraintes lisibles)
+    # 4) TXT (contraintes lisibles) — inchangé
     constraints_human = [
-        c.get("human") or json.dumps(c, ensure_ascii=False) for c in data.get("constraints", [])
+        c.get("human") or json.dumps(c, ensure_ascii=False)
+        for c in data.get("constraints", [])
     ]
-    txt_bytes = ("\n".join(constraints_human) + ("\n" if constraints_human else "")).encode("utf-8")
+    txt_bytes: bytes = ("\n".join(constraints_human) + ("\n" if constraints_human else "")).encode("utf-8")
 
-    # 5) ZIP : l’archive contient les fichiers nommés <prefix>.<ext>
-    svg_name = f"{prefix}.svg"
-    png_name = f"{prefix}.png" if png_bytes else None
-    pdf_name = f"{prefix}.pdf" if pdf_bytes else None
-    json_name = f"{prefix}.json"
-    txt_name = f"{prefix}.txt"
-    zip_name = f"export_{prefix}.zip"  # <- Nom public de l’archive
+    # 5) Noms de fichiers publics
+    # Vue élève
+    s_svg_name: str = f"{prefix}.svg"
+    s_png_name: Optional[str] = f"{prefix}.png" if s_png else None
+    s_pdf_name: Optional[str] = f"{prefix}.pdf" if s_pdf else None
+    # Vue prof (suffixe _vue_prof)
+    t_svg_name: str = f"{prefix}_vue_prof.svg"
+    t_png_name: Optional[str] = f"{prefix}_vue_prof.png" if t_png else None
+    t_pdf_name: Optional[str] = f"{prefix}_vue_prof.pdf" if t_pdf else None
+    # Sauvegarde et archive
+    json_name: str = f"{prefix}.json"
+    txt_name: str = f"{prefix}.txt"
+    zip_name: str = f"export_{prefix}.zip"
 
+    # 6) Contenu de l’archive ZIP
     files_for_zip: Dict[str, bytes] = {
-        svg_name: svg_bytes,
+        s_svg_name: svg_student_bytes,
+        t_svg_name: svg_teacher_bytes,
         json_name: json_bytes,
         txt_name: txt_bytes,
     }
-    if png_bytes:
-        files_for_zip[png_name] = png_bytes  # type: ignore[index]
-    if pdf_bytes:
-        files_for_zip[pdf_name] = pdf_bytes  # type: ignore[index]
-    zip_bytes = _package_zip(files_for_zip)
+    if s_png:
+        files_for_zip[s_png_name] = s_png  # type: ignore[index]
+    if s_pdf:
+        files_for_zip[s_pdf_name] = s_pdf  # type: ignore[index]
+    if t_png:
+        files_for_zip[t_png_name] = t_png  # type: ignore[index]
+    if t_pdf:
+        files_for_zip[t_pdf_name] = t_pdf  # type: ignore[index]
 
-    # 6) Cache + URLs (enregistrer aussi les noms fichiers pour Content-Disposition)
-    urls = _cache_artifacts_and_urls(
+    zip_bytes: bytes = _package_zip(files_for_zip)
+
+    # 7) Mise en cache + URLs de téléchargement (clé "fmt" libre → on nomme explicitement)
+    urls_student_teacher: Dict[str, str] = _cache_artifacts_and_urls(
         request,
         artifacts=ExportArtifacts(
-            svg=svg_bytes,
-            png=png_bytes or b"",
-            pdf=pdf_bytes or b"",
-            json=json_bytes,
-            txt=txt_bytes,
-            zip=zip_bytes,
+            # on sérialise sous des "formats" explicites pour distinguer élève/prof
+            **{
+                "student_svg": svg_student_bytes,
+                "student_png": s_png or b"",
+                "student_pdf": s_pdf or b"",
+                "teacher_svg": svg_teacher_bytes,
+                "teacher_png": t_png or b"",
+                "teacher_pdf": t_pdf or b"",
+                "json": json_bytes,
+                "txt": txt_bytes,
+                "zip": zip_bytes,
+            }
         ),
         names={
-            "svg": svg_name,
-            "png": png_name,
-            "pdf": pdf_name,
+            "student_svg": s_svg_name,
+            "student_png": s_png_name,
+            "student_pdf": s_pdf_name,
+            "teacher_svg": t_svg_name,
+            "teacher_png": t_png_name,
+            "teacher_pdf": t_pdf_name,
             "json": json_name,
             "txt": txt_name,
             "zip": zip_name,
         },
     )
 
-    return JsonResponse({"status": "OK", "download": urls})
+    # 8) Réponse structurée (front attend .student / .teacher / .json / .zip)
+    download_payload: Dict[str, Any] = {
+        "student": {
+            "svg": urls_student_teacher.get("student_svg"),
+            "png": urls_student_teacher.get("student_png"),
+            "pdf": urls_student_teacher.get("student_pdf"),
+        },
+        "teacher": {
+            "svg": urls_student_teacher.get("teacher_svg"),
+            "png": urls_student_teacher.get("teacher_png"),
+            "pdf": urls_student_teacher.get("teacher_pdf"),
+        },
+        "json": urls_student_teacher.get("json"),
+        "zip": urls_student_teacher.get("zip"),
+    }
+
+    return JsonResponse({"status": "OK", "download": download_payload})
 
 
 @require_GET
 def download_artifact(request: HttpRequest, token: str, fmt: str) -> HttpResponse:
     """
     Sert un artefact depuis le cache via {token} et {fmt}.
-    fmt ∈ {"svg", "png", "pdf", "txt", "json", "zip"}.
-    Ajoute un header Content-Disposition pour proposer un nom de fichier propre.
+
+    {fmt} peut maintenant être n’importe quelle clé
+    utilisée lors du cache (ex. "student_svg", "teacher_png", "json", "zip", etc.).
+    On récupère le nom public depuis le cache pour déterminer le Content-Type ; à défaut,
     """
+    import mimetypes
+
     key = f"pc:{token}:{fmt}"
     blob: Optional[bytes] = cache.get(key)  # type: ignore[assignment]
     if blob is None:
         return HttpResponseNotFound("introuvable ou expiré")
 
-    # Récupère le nom public si on l’a enregistré
-    filename = cache.get(f"{key}:name") or f"plandeclasse-export.{fmt}"
+    # Nom de fichier public (si enregistré au moment du caching)
+    filename = cache.get(f"{key}:name")  # ex. "plan..._vue_prof.pdf"
+    filename_str = str(filename) if filename else None
 
-    if fmt == "svg":
-        resp = HttpResponse(blob, content_type="image/svg+xml")
-    elif fmt == "png":
-        resp = HttpResponse(blob, content_type="image/png")
-    elif fmt == "pdf":
-        resp = HttpResponse(blob, content_type="application/pdf")
-    elif fmt == "txt":
-        resp = HttpResponse(blob, content_type="text/plain; charset=utf-8")
-    elif fmt == "json":
-        resp = HttpResponse(blob, content_type="application/json; charset=utf-8")
-    elif fmt == "zip":
-        resp = HttpResponse(blob, content_type="application/zip")
+    # 1) Tentative de déduction du content-type depuis le nom public
+    content_type: Optional[str] = None
+    if filename_str:
+        guessed, _ = mimetypes.guess_type(filename_str)
+        if guessed:
+            content_type = guessed
+            # encodage explicite pour les types textuels connus
+            if content_type == "application/json":
+                content_type = "application/json; charset=utf-8"
+            elif content_type == "text/plain":
+                content_type = "text/plain; charset=utf-8"
+
+    # 2) Fallback : déduction simple depuis le suffixe de fmt (après le dernier "_")
+    if not content_type:
+        base = fmt.rsplit("_", 1)[-1].lower()  # ex. "teacher_pdf" -> "pdf"
+        content_type = {
+            "svg": "image/svg+xml",
+            "png": "image/png",
+            "pdf": "application/pdf",
+            "txt": "text/plain; charset=utf-8",
+            "json": "application/json; charset=utf-8",
+            "zip": "application/zip",
+        }.get(base, "application/octet-stream")
+
+    resp = HttpResponse(blob, content_type=content_type)
+    # Ajoute un nom de fichier propre si on l’a
+    if filename_str:
+        resp["Content-Disposition"] = f'attachment; filename="{filename_str}"'
     else:
-        return HttpResponseNotFound("format invalide")
-
-    resp["Content-Disposition"] = f'attachment; filename="{filename}"'
+        # Nom par défaut basé sur le fmt, en dernier ressort
+        resp["Content-Disposition"] = f'attachment; filename="plandeclasse-export-{fmt}"'
     return resp
+
