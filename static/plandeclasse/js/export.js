@@ -133,18 +133,20 @@ function collectRoomSvgMarkupTeacher() {
 
     const clone = prepareSvgClone(svgEl);
 
-    // Hauteur nécessaire au calcul du miroir
+    // Dimensions nécessaires au pivot 180°
+    const W = Number(clone.getAttribute("width") || "0");
     const H = Number(clone.getAttribute("height") || "0");
-    if (!Number.isFinite(H) || H <= 0) {
-        // Fallback : si la hauteur vaut 0, on renvoie un clone non transformé.
+    if (!Number.isFinite(W) || !Number.isFinite(H) || W <= 0 || H <= 0) {
+        // Fallback : si dimensions invalides, renvoyer le clone tel quel
         return serializeSvg(clone);
     }
 
     const ns = "http://www.w3.org/2000/svg";
     const g = document.createElementNS(ns, "g");
-    g.setAttribute("transform", `translate(0, ${H}) scale(1, -1)`);
+    // Rotation 180° : translate(W,H) puis scale(-1,-1)
+    g.setAttribute("transform", `translate(${W}, ${H}) scale(-1, -1)`);
 
-    // Déplacer tout (sauf <style> et <rect width="100%" height="100%">) dans <g>
+    // Déplacer tout (sauf <style> et fond blanc) dans le <g> pivot
     const children = Array.from(clone.childNodes);
     for (let i = 0; i < children.length; i++) {
         const n = children[i];
@@ -156,29 +158,49 @@ function collectRoomSvgMarkupTeacher() {
             n.getAttribute("width") === "100%" &&
             n.getAttribute("height") === "100%";
         if (isStyle || isBg) continue;
-        g.appendChild(n); // on déplace ce nœud dans le groupe miroir
+        g.appendChild(n);
     }
     clone.appendChild(g);
 
-    // Pour chaque <text> : remet l’orientation des glyphes et ajuste la position.
+    // Redressement des textes : flip local + inversion de leurs coordonnées.
     const texts = g.querySelectorAll("text");
     texts.forEach((t) => {
+        const xAttr = t.getAttribute("x");
         const yAttr = t.getAttribute("y");
-        if (!yAttr) return; // prudence : si pas de y (peu probable ici)
 
-        const y0 = Number(yAttr);
-        if (!Number.isFinite(y0)) return;
+        // On ne touche qu'aux textes positionnés ; prudence en cas de valeurs non numériques
+        const hasX = xAttr != null && xAttr !== "";
+        const hasY = yAttr != null && yAttr !== "";
 
-        // y := -y0 (compensation de l’échelle négative locale)
-        t.setAttribute("y", String(-y0));
+        if (hasX) {
+            const x0 = Number(xAttr);
+            if (Number.isFinite(x0)) t.setAttribute("x", String(-x0));
+        }
+        if (hasY) {
+            const y0 = Number(yAttr);
+            if (Number.isFinite(y0)) t.setAttribute("y", String(-y0));
+        }
 
-        // Préserve d’éventuels transforms en ajoutant scale(1,-1) en tête
+        // Flip local pour remettre les glyphes à l'endroit (X et Y)
         const prev = t.getAttribute("transform") || "";
-        t.setAttribute("transform", `scale(1,-1)${prev ? " " + prev : ""}`);
+        t.setAttribute("transform", `scale(-1,-1)${prev ? " " + prev : ""}`);
+
+        // IMPORTANT : les <tspan> avec un attribut x *absolu* écrasent le x du <text>
+        // → on négative également leurs x.
+        const tspans = t.querySelectorAll("tspan[x]");
+        tspans.forEach((sp) => {
+            const tx = sp.getAttribute("x");
+            if (tx == null || tx === "") return;
+            const x0 = Number(tx);
+            if (Number.isFinite(x0)) sp.setAttribute("x", String(-x0));
+        });
+
+        // NB : on ne touche pas aux dy/dx (relatifs) : le flip local gère le sens.
     });
 
     return serializeSvg(clone);
 }
+
 
 /* ==========================================================================
    Construction du payload envoyé au backend
