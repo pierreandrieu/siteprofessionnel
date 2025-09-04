@@ -213,9 +213,8 @@
                                 <label class="btn btn-outline-secondary btn-sm" for="nvPrenomNom">prénom + nom</label>
                             </div>
                         </div>
-                        <!-- Export (NOUVELLE VERSION : vue élève, vue prof, sauvegarde, archive) -->
                         <div class="export-block mt-3">
-                            <div class="row g-2 align-items-end">
+                            <div class="row g-2 align-items-start">
                                 <div class="col-12 col-sm-6 col-md-4 col-lg-3">
                                     <label for="className" class="form-label mb-1">Nom de la classe</label>
                                     <input id="className" class="form-control form-control-sm" required
@@ -289,38 +288,50 @@
             <div class="col-12">
                 <div class="card-body constraints-body">
                     <div class="constraints-form">
-                        <div class="row g-2 align-items-end">
-                            <div class="col-12 col-md-4 col-lg-3">
-                                <label class="form-label">élève A</label>
-                                <select class="form-select cst-select" id="cstStudentA"></select>
+                        <div class="row constraints-grid g-3 align-items-start">
+                            <!-- Sélection multi-élèves -->
+                            <div class="col-12 col-lg-5">
+                                <label class="form-label is-header">élèves concernés</label>
+                                <select class="form-select form-select-sm" id="cstStudents" multiple size="8"
+                                        aria-describedby="cstStudentsHelp"></select>
+                                <div id="cstStudentsHelp" class="form-text">
+                                    Astuce : pour une sélection multiple, utilisez <strong>Ctrl</strong> (Windows/Linux)
+                                    ou <strong>⌘ Cmd</strong> (macOS). Pour une sélection continue, utilisez
+                                    <strong>Maj</strong>.
+                                </div>
+
                             </div>
-                            <div class="col-12 col-md-4 col-lg-3">
-                                <label class="form-label">type de contrainte</label>
-                                <select class="form-select" id="constraintType">
+
+                            <!-- Type de contrainte -->
+                            <div class="col-12 col-sm-6 col-lg-3">
+                                <label class="form-label is-header">type de contrainte</label>
+                                <select class="form-select form-select-sm" id="constraintType">
                                     <option value="front_rows">dans les 'k' premières rangées</option>
                                     <option value="back_rows">dans les 'k' dernières rangées</option>
                                     <option value="solo_table">seul sur sa table</option>
                                     <option value="empty_neighbor">au moins un siège vide à côté</option>
-                                    <option value="same_table">à la même table que</option>
-                                    <option value="far_apart">distance d'au moins 'd' avec l'élève</option>
+                                    <option value="same_table">à la même table</option>
+                                    <option value="far_apart">distance d'au moins 'd' entre eux</option>
                                 </select>
                             </div>
-                            <div class="col-12 col-md-4 col-lg-3" id="cstStudentBWrap" hidden>
-                                <label class="form-label">Élève B</label>
-                                <select class="form-select cst-select" id="cstStudentB"></select>
-                            </div>
-                            <div class="col-12 col-md-4 col-lg-3" id="cstParamWrap" hidden>
-                                <label class="form-label" id="cstParamLabel">Paramètre</label>
+
+                            <!-- Paramètre (k ou d) -->
+                            <div class="col-12 col-sm-6 col-lg-2" id="cstParamWrap" hidden>
+                                <label class="form-label is-header" id="cstParamLabel">Paramètre</label>
                                 <input id="cstParam" type="number" min="1"
-                                       class="form-control form-control-sm w-auto param-input"
-                                       inputmode="numeric" placeholder="">
+                                       class="form-control form-control-sm param-input" inputmode="numeric"
+                                       placeholder="">
                                 <div class="form-text" id="cstParamHelp"></div>
                             </div>
-                            <div class="col-12 col-md-auto ms-md-auto">
-                                <label class="form-label invisible d-none d-md-block">Actions</label>
-                                <div class="text-end">
-                                    <button class="btn btn-sm btn-primary w-auto" type="button" id="btnAddConstraint">
-                                        ajouter contrainte
+
+                            <!-- Actions -->
+                            <div class="col-12 col-lg-2 col-actions">
+                                <div class="btn-row">
+                                    <button class="btn btn-sm btn-primary" type="button" id="btnAddConstraint">ajouter
+                                        contrainte
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary" type="button"
+                                            id="btnCancelConstraint">réinitialiser
                                     </button>
                                 </div>
                             </div>
@@ -338,20 +349,19 @@
                         </div>
 
                         <div class="d-flex align-items-center justify-content-center gap-2 mt-3">
-            <span id="solveBtnWrap" class="d-inline-block" tabindex="0"
-                  data-bs-toggle="tooltip" data-bs-placement="top" data-bs-trigger="hover focus"
-                  title="Chargez un CSV d’élèves et appliquez un schéma de salle pour lancer le calcul">
-              <button id="btnSolve" class="btn btn-success" type="button" disabled>
-                générer le plan de classe avec les contraintes ci-dessous
-              </button>
-                <button id="btnClearRoom" class="btn btn-outline-secondary">réinitialiser la salle </button>
-            </span>
+    <span id="solveBtnWrap" class="d-inline-block" tabindex="0"
+          data-bs-toggle="tooltip" data-bs-placement="top" data-bs-trigger="hover focus"
+          title="Chargez un CSV d’élèves et appliquez un schéma de salle pour lancer le calcul">
+      <button id="btnSolve" class="btn btn-success" type="button" disabled>
+        générer le plan de classe avec les contraintes ci-dessous
+      </button>
+      <button id="btnClearRoom" class="btn btn-outline-secondary">réinitialiser la salle</button>
+    </span>
                             <div id="solveStatus" class="small text-muted"></div>
                         </div>
                     </div>
 
                     <hr class="my-3">
-
                     <div class="constraints-list">
                         <div id="constraintsList"></div>
                     </div>

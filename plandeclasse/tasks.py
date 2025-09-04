@@ -106,7 +106,16 @@ def t_solve_plandeclasse(self, payload: Dict[str, Any]) -> Dict[str, Any]:
     res = slv.resoudre(salle, eleves, contraintes, budget_temps_ms=budget_ms)
 
     if res.affectation is None:
-        return {"status": "FAILURE", "error": "Aucune solution trouvée."}
+        return {
+            "status": "FAILURE",
+            "error": (
+                "Aucune solution trouvée. Vos contraintes sont incompatibles entre elles "
+                "ou avec la disposition de la salle. Essayez l’une des pistes suivantes : "
+                "modifiez les valeurs des paramètres k ou d pour vos contraintes, "
+                "retirer une contrainte de groupe, libérer quelques sièges "
+                "interdits, puis relancez."
+            ),
+        }
 
     # ----------- Reconstruction assignment (seatKey -> studentId UI) -----------
     assignment: Dict[str, int] = {}
