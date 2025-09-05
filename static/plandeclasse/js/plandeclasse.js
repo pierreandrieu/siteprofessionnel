@@ -91,8 +91,7 @@ function init() {
     // Formulaire contraintes
     $("#constraintType")?.addEventListener("change", onConstraintTypeChange);
     $("#btnAddConstraint")?.addEventListener("click", addConstraint);
-    $("#btnCancelConstraint")?.addEventListener("click", cancelConstraintForm);
-
+    document.getElementById("btnCancelConstraint")?.addEventListener("click", cancelConstraintForm);
     // Export
     document.getElementById("btnExport")?.addEventListener("click", startExport);
     setupExportUI();

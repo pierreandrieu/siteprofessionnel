@@ -294,3 +294,12 @@
     margin-top: .15rem;
 }
 
+/* Fallback mobile : liste des élèves en cases à cocher */
+#cstStudentsMobile .list-group-item {
+    padding-top: .4rem;
+    padding-bottom: .4rem;
+}
+
+#cstStudentsMobile input[type="checkbox"] {
+    transform: scale(1.05);
+}

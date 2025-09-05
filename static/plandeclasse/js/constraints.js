@@ -21,6 +21,51 @@ function getStudentsSorted() {
     return [...state.students].sort(compareByLastThenFirst);
 }
 
+/**
+ * Retourne la sélection d'élèves en tenant compte du fallback mobile.
+ * - Desktop (≥ sm) : lit le <select multiple>
+ * - Mobile (< sm) : lit les <input type="checkbox"> générés dans #cstStudentsMobile
+ */
+function getSelectedStudentIds() {
+    const isMobile = window.matchMedia("(max-width: 575.98px)").matches;
+    if (isMobile) {
+        const inputs = document.querySelectorAll("#cstStudentsMobile input[type=checkbox]:checked");
+        return Array.from(inputs).map(i => Number(i.value));
+    }
+    const sel = /** @type {HTMLSelectElement|null} */ (document.getElementById("cstStudents"));
+    if (!sel) return [];
+    return Array.from(sel.selectedOptions).map(o => Number(o.value));
+}
+
+/** Réinitialise le formulaire de création de contraintes (desktop + mobile). */
+export function cancelConstraintForm() {
+    // Desktop: <select multiple>
+    const sel = /** @type {HTMLSelectElement|null} */ (document.getElementById("cstStudents"));
+    if (sel) sel.selectedIndex = -1;
+
+    // Mobile: checkboxes
+    const mob = /** @type {HTMLElement|null} */ (document.getElementById("cstStudentsMobile"));
+    if (mob) {
+        mob.querySelectorAll('input[type="checkbox"]').forEach((i) => {
+            /** @type {HTMLInputElement} */ (i).checked = false;
+        });
+    }
+
+    // Type de contrainte ↩︎ première option
+    const typeSel = /** @type {HTMLSelectElement|null} */ (document.getElementById("constraintType"));
+    if (typeSel) typeSel.selectedIndex = 0;
+
+    // Paramètre (k/d) vidé puis UI remise à jour
+    const p = /** @type {HTMLInputElement|null} */ (document.getElementById("cstParam"));
+    if (p) p.value = "";
+
+    // Recalcule “k / d / aide” selon le type par défaut
+    onConstraintTypeChange();
+
+    // Focus ergonomique
+    (sel ?? typeSel)?.focus();
+}
+
 
 /** Formate une liste de noms "A, B et C". */
 function formatNamesList(ids /**: number[] */) /**: string */ {
@@ -52,22 +97,52 @@ function newBatchId() {
 }
 
 export function refreshConstraintSelectors() {
-    const sel = /** @type {HTMLSelectElement|null} */ ($("#cstStudents"));
-    if (!sel) return;
+    // Desktop select multiple
+    const sel = /** @type {HTMLSelectElement|null} */ (document.getElementById("cstStudents"));
+    // Mobile list-group with checkboxes
+    const mob = /** @type {HTMLElement|null} */ (document.getElementById("cstStudentsMobile"));
 
-    const previous = new Set(Array.from(sel.selectedOptions).map(o => o.value));
-    const studentsSorted = getStudentsSorted();
+    const studentsSorted = [...state.students].sort(compareByLastThenFirst);
 
-    sel.innerHTML = "";
-    for (const st of studentsSorted) {
-        const opt = document.createElement("option");
-        opt.value = String(st.id);
-        opt.textContent = `${st.first} ${st.last}`.trim();
-        if (previous.has(opt.value)) opt.selected = true;
-        sel.appendChild(opt);
+    // Mémoriser la sélection courante (desktop ou mobile) pour la restaurer
+    const previouslySelected = new Set(getSelectedStudentIds());
+
+    // ---- Desktop : <select multiple>
+    if (sel) {
+        sel.innerHTML = "";
+        for (const st of studentsSorted) {
+            const opt = document.createElement("option");
+            opt.value = String(st.id);
+            opt.textContent = `${st.first} ${st.last}`.trim();
+            if (previouslySelected.has(st.id)) opt.selected = true;
+            sel.appendChild(opt);
+        }
     }
 
-    // Par défaut, si rien de sélectionné, on ne force pas : l’utilisateur choisira.
+    // ---- Mobile : cases à cocher
+    if (mob) {
+        mob.innerHTML = "";
+        for (const st of studentsSorted) {
+            const id = String(st.id);
+
+            const wrap = document.createElement("label");
+            wrap.className = "list-group-item d-flex align-items-center gap-2 py-2";
+
+            const input = document.createElement("input");
+            input.type = "checkbox";
+            input.className = "form-check-input m-0";
+            input.value = id;
+            input.checked = previouslySelected.has(st.id);
+
+            const txt = document.createElement("span");
+            txt.className = "flex-grow-1";
+            txt.textContent = `${st.first} ${st.last}`.trim();
+
+            wrap.appendChild(input);
+            wrap.appendChild(txt);
+            mob.appendChild(wrap);
+        }
+    }
 }
 
 
@@ -103,28 +178,19 @@ export function onConstraintTypeChange() {
     }
 }
 
-/* ==========================================================================
-   Ajout de contrainte(s) à partir d’un groupe
-   ========================================================================== */
-
 /**
- * Ajoute un ou plusieurs éléments dans state.constraints selon :
- * - contrainte unaire : 1 entrée / élève sélectionné,
- * - contrainte binaire : 1 entrée / paire du groupe.
+ * Ajoute un ou plusieurs éléments dans state.constraints à partir d’un GROUPE.
  *
- * Chaque entrée reçoit un 'batch_id' commun pour l’affichage groupé et la suppression.
+ * - Contraintes unaires  : 1 entrée / élève sélectionné
+ * - Contraintes binaires : 1 entrée / paire du groupe (C(n,2))
+ *
+ * Un "batch_id" commun est affecté à toutes les entrées générées.
+ * On pousse aussi un "marqueur" _batch_marker_ (UI only) pour l’affichage/suppression groupés.
  */
 export function addConstraint() {
-    const t = /** @type {HTMLSelectElement} */ ($("#constraintType")).value;
-    const sel = /** @type {HTMLSelectElement} */ ($("#cstStudents"));
-    const paramInput = /** @type {HTMLInputElement} */ ($("#cstParam"));
+    const t = /** @type {HTMLSelectElement} */ (document.getElementById("constraintType")).value;
+    const selectedIds = getSelectedStudentIds();
 
-    if (!sel) return;
-
-    // Récupère les ids sélectionnés (en nombres)
-    const selectedIds = Array.from(sel.selectedOptions).map(o => Number(o.value)).filter(Number.isFinite);
-
-    // Contrôle minimal
     const isUnary = ["front_rows", "back_rows", "solo_table", "empty_neighbor"].includes(t);
     const isBinary = ["same_table", "far_apart"].includes(t);
 
@@ -137,78 +203,61 @@ export function addConstraint() {
         return;
     }
 
-    // Paramètre éventuel (k ou d)
-    const pValRaw = paramInput?.value ? Number(paramInput.value) : null;
+    const pInput = /** @type {HTMLInputElement|null} */ (document.getElementById("cstParam"));
+    const pValRaw = pInput?.value ? Number(pInput.value) : null;
+
     const maxD = computeMaxManhattan(state.schema);
-    const d = (t === "far_apart")
-        ? Math.min(Math.max(1, pValRaw || 1), Math.max(1, maxD))
-        : null;
+    const d = (t === "far_apart") ? Math.min(Math.max(2, pValRaw || 2), Math.max(2, maxD)) : null; // min 2 cohérent avec le label
+    const k = (t === "front_rows" || t === "back_rows") ? Math.max(1, pValRaw ?? 1) : null;
 
-    const k = (t === "front_rows" || t === "back_rows")
-        ? (pValRaw ?? null)
-        : null;
-
-    // Batch id + libellé pluriel pour la UI
     const batch_id = newBatchId();
     const namesPlural = formatNamesList(selectedIds);
     let batch_human = "";
-
-    if (t === "front_rows") {
-        batch_human = `${namesPlural} doivent être dans les premières rangées (k=${k ?? "?"})`;
-    } else if (t === "back_rows") {
-        batch_human = `${namesPlural} doivent être dans les dernières rangées (k=${k ?? "?"})`;
-    } else if (t === "solo_table") {
-        batch_human = `${namesPlural} doi(ven)t être isolé(s) sur une table`;
-    } else if (t === "empty_neighbor") {
-        batch_human = `${namesPlural} doi(ven)t avoir au moins un siège vide à côté`;
-    } else if (t === "same_table") {
-        batch_human = `${namesPlural} doivent être à la même table`;
-    } else if (t === "far_apart") {
-        batch_human = `${namesPlural} doivent être éloignés d’une distance d’au moins d=${d ?? "?"} entre eux`;
+    switch (t) {
+        case "front_rows":
+            batch_human = `${namesPlural} doivent être dans les premières rangées (k=${k ?? "?"})`;
+            break;
+        case "back_rows":
+            batch_human = `${namesPlural} doivent être dans les dernières rangées (k=${k ?? "?"})`;
+            break;
+        case "solo_table":
+            batch_human = `${namesPlural} doivent être isolé·e·s sur une table`;
+            break;
+        case "empty_neighbor":
+            batch_human = `${namesPlural} doivent avoir au moins un siège vide à côté`;
+            break;
+        case "same_table":
+            batch_human = `${namesPlural} doivent être à la même table`;
+            break;
+        case "far_apart":
+            batch_human = `${namesPlural} doivent être éloigné·e·s d’une distance d’au moins d=${d ?? "?"} entre eux/elles`;
+            break;
     }
 
-    // Expansion : crée les contraintes réelles
     const payloads = [];
-
     if (isUnary) {
         for (const a of selectedIds) {
-            const c = /** @type {any} */ ({type: t, a, batch_id});
+            const c = /** @type {any} */ ({type: t, a, batch_id, human: ""});
             if (k != null) c.k = k;
-            c.human = ""; // libellé géré par le lot
             payloads.push(c);
         }
-    } else if (isBinary) {
-        for (const [a, b] of pairs(selectedIds)) {
-            const c = /** @type {any} */ ({type: t, a, b, batch_id});
-            if (d != null) c.d = d;
-            c.human = ""; // libellé géré par le lot
-            payloads.push(c);
+    } else {
+        for (let i = 0; i < selectedIds.length; i++) {
+            for (let j = i + 1; j < selectedIds.length; j++) {
+                const a = selectedIds[i], b = selectedIds[j];
+                const c = /** @type {any} */ ({type: t, a, b, batch_id, human: ""});
+                if (d != null) c.d = d;
+                payloads.push(c);
+            }
         }
     }
 
-    // Ajout au state
     for (const p of payloads) state.constraints.push(p);
+    state.constraints.push({type: "_batch_marker_", batch_id, human: batch_human, count: payloads.length});
 
-    // Enregistre un “marqueur” de lot via un élément synthétique (UI only)
-    // Astuce : pas envoyé au backend (on filtre dans build payload côté solveur/export si besoin)
-    state.constraints.push({
-        type: "_batch_marker_",
-        batch_id,
-        human: batch_human,
-        count: payloads.length,
-    });
-
-    // Refresh UI
     renderConstraints();
 }
 
-/** Réinitialise le formulaire. */
-export function cancelConstraintForm() {
-    /** @type {HTMLSelectElement} */ ($("#cstStudents")).selectedIndex = -1;
-    /** @type {HTMLSelectElement} */ ($("#constraintType")).selectedIndex = 0;
-    /** @type {HTMLInputElement} */ ($("#cstParam")).value = "";
-    onConstraintTypeChange();
-}
 
 /* ==========================================================================
    Rendu + suppression (gère les lots)

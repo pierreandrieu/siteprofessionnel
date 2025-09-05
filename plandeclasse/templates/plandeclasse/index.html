@@ -290,17 +290,40 @@
                     <div class="constraints-form">
                         <div class="row constraints-grid g-3 align-items-start">
                             <!-- Sélection multi-élèves -->
+                            <!-- Sélection multi-élèves -->
                             <div class="col-12 col-lg-5">
-                                <label class="form-label is-header">élèves concernés</label>
-                                <select class="form-select form-select-sm" id="cstStudents" multiple size="8"
-                                        aria-describedby="cstStudentsHelp"></select>
-                                <div id="cstStudentsHelp" class="form-text">
-                                    Astuce : pour une sélection multiple, utilisez <strong>Ctrl</strong> (Windows/Linux)
-                                    ou <strong>⌘ Cmd</strong> (macOS). Pour une sélection continue, utilisez
-                                    <strong>Maj</strong>.
+                                <label id="cstStudentsLabel" class="form-label is-header">élèves concernés</label>
+
+                                <!-- Desktop / tablettes ≥ sm : select multiple classique -->
+                                <div class="d-none d-sm-block">
+                                    <select
+                                            class="form-select form-select-sm"
+                                            id="cstStudents"
+                                            multiple
+                                            size="8"
+                                            aria-describedby="cstStudentsHelp"
+                                            aria-labelledby="cstStudentsLabel"></select>
+                                    <div id="cstStudentsHelp" class="form-text">
+                                        Astuce (ordinateur)&nbsp;: maintenez <strong>Ctrl</strong> (Windows/Linux)
+                                        ou <strong>⌘ Cmd</strong> (macOS) pour ajouter/retirer un élève, et
+                                        <strong>Maj</strong> pour sélectionner une plage continue.
+                                    </div>
                                 </div>
 
+                                <!-- Mobile < sm : liste de cases à cocher -->
+                                <div class="d-block d-sm-none">
+                                    <div id="cstStudentsMobile"
+                                         class="list-group list-group-flush border rounded small"
+                                         role="group"
+                                         aria-labelledby="cstStudentsLabel">
+                                        <!-- cases à cocher injectées côté JS -->
+                                    </div>
+                                    <div class="form-text">
+                                        Sur mobile&nbsp;: touchez pour cocher/décocher les élèves concernés.
+                                    </div>
+                                </div>
                             </div>
+
 
                             <!-- Type de contrainte -->
                             <div class="col-12 col-sm-6 col-lg-3">
@@ -333,6 +356,7 @@
                                     <button class="btn btn-sm btn-outline-secondary" type="button"
                                             id="btnCancelConstraint">réinitialiser
                                     </button>
+                                    
                                 </div>
                             </div>
                         </div>
