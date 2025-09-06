@@ -10,13 +10,17 @@ class Salle:
     """
     Modélise une salle à partir d'un schéma de rangées.
 
-    Le `schema` attendu est une liste de rangées, et chaque rangée est une
-    liste d'entiers représentant la capacité des tables de gauche à droite.
+    Convention additionnelle :
+    - Une valeur **négative** dans le schéma (ex. -2) représente un **trou**
+      de largeur équivalente à 2 emplacements de table (côté rendu UI).
+    - Le solveur ignore ces trous (aucune Table/Position créée), mais les
+      indices (x, y) restent alignés avec le schéma pour garder la cohérence
+      des clés côté frontend.
 
     Exemple :
         schema = [
-            [2, 3],   # rangée y = 0, colonnes x = 0 (cap=2), x = 1 (cap=3)
-            [2, 2],   # rangée y = 1, colonnes x = 0 (cap=2), x = 1 (cap=2)
+            [2, 3, -2, 2],   # 2 places, 3 places, trou de 2, 2 places
+            [2, 2],
         ]
     """
 
@@ -26,16 +30,19 @@ class Salle:
 
         Args:
             schema: liste de rangées ; chaque rangée est une liste des capacités
-                    des tables, de gauche à droite.
+                    des tables, de gauche à droite. Les valeurs <= 0 sont
+                    interprétées comme des **trous** (pas de table créée).
         """
+        # Copie défensive
         self._schema: List[List[int]] = [list(ligne) for ligne in schema]
         self._tables: List[Table] = []
 
         # Parcours rangée par rangée (y), puis colonne par colonne (x)
         for y, ligne in enumerate(self._schema):
             for x, capacite in enumerate(ligne):
-                # Création d'une table aux coordonnées (x, y) avec sa capacité.
-                self._tables.append(Table(x=x, y=y, capacite=capacite))
+                # Nouv.: on **ignore** les capacités <= 0 (trous visuels côté UI)
+                if capacite > 0:
+                    self._tables.append(Table(x=x, y=y, capacite=capacite))
 
     @classmethod
     def depuis_mode_compact(cls, nb_lignes: int, capacites_par_table: List[int]) -> "Salle":
@@ -43,13 +50,8 @@ class Salle:
         Construit une salle avec `nb_lignes` identiques, chacune ayant
         les capacités listées dans `capacites_par_table`.
 
-        Exemple : nb_lignes = 3, capacites_par_table = [2, 3, 2]
-        → schema =
-            [
-              [2, 3, 2],
-              [2, 3, 2],
-              [2, 3, 2],
-            ]
+        Remarque : si `capacites_par_table` contient des valeurs négatives,
+        elles seront considérées comme des trous **dans chaque rangée**.
         """
         schema: List[List[int]] = [list(capacites_par_table) for _ in range(nb_lignes)]
         return cls(schema)

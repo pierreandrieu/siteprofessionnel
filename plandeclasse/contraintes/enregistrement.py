@@ -9,7 +9,7 @@ from .unaires import (
     DoitEtreDansDernieresRangees,
     DoitEtreSeulALaTable,
     DoitAvoirVoisinVide,
-    DoitEtreExactementIci,
+    DoitEtreExactementIci, DoitNePasAvoirVoisinAdjacent,
 )
 from .binaires import (
     DoiventEtreEloignes,
@@ -90,3 +90,10 @@ def _fab_siege_interdit(code: Mapping[str, Any], ctx):
     y: int = int(code["y"])
     seat: int = int(code["seat"])
     return SiegeDoitEtreVide(x=x, y=y, seat=seat)
+
+
+@enregistrer(TypeContrainte.NO_ADJACENT)
+def _fab_no_adjacent(code, ctx):
+    nom: str = str(code["eleve"])
+    return DoitNePasAvoirVoisinAdjacent(eleve=ctx.index_eleves_par_nom[nom])
+

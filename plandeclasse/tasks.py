@@ -81,7 +81,7 @@ def t_solve_plandeclasse(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         constraints_ui=constraints_ui,
         forbidden_keys=forbidden,
         placements=placements,
-        respecter_placements_existants=True,
+        respecter_placements_existants=bool(options.get("lock_placements", True))
     )
 
     # ----------- Choix du solveur -----------

@@ -11,6 +11,36 @@ import {state} from "./state.js";
 import {renderRoom, renderStudents, updateBanButtonLabel} from "./render.js";
 import {renderConstraints} from "./constraints.js";
 
+/**
+ * Réinitialise **uniquement** le plan de classe (affectations).
+ *
+ * Effets :
+ * - Supprime toutes les affectations seatKey -> studentId
+ * - Supprime l’inverse studentId -> seatKey
+ * - Efface la sélection courante (élève/siège)
+ * - Re-rend l’UI et resynchronise les boutons
+ *
+ * Ne modifie PAS :
+ * - Le schéma de salle (rangées / tables)
+ * - Les contraintes (state.constraints)
+ * - Les sièges explicitement interdits (state.forbidden)
+ */
+export function resetPlanKeepRoom() {
+    // Efface les affectations
+    state.placements.clear();
+    state.placedByStudent.clear();
+
+    // Efface la sélection (pour éviter des états “fantômes”)
+    state.selection.studentId = null;
+    state.selection.seatKey = null;
+
+    // Re-rendu + synchronisation des boutons de contexte
+    renderRoom();
+    renderStudents();
+    renderConstraints();
+    updateBanButtonLabel();
+}
+
 export function seatClick(seatKey /**: string */) {
     const occupant = state.placements.get(seatKey) ?? null;
     const selSid = state.selection.studentId;

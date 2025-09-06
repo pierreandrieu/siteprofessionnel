@@ -115,6 +115,18 @@ function collectRoomSvgMarkupStudent() {
     return serializeSvg(clone);
 }
 
+function buildObjectiveMarkers() {
+    const out = [];
+    if (state.options.prefer_alone) {
+        out.push({type: "_objective_", human: "objectif : maximiser les élèves sans voisin"});
+    }
+    if (state.options.prefer_mixage) {
+        out.push({type: "_objective_", human: "objectif : minimiser les paires adjacentes de même genre"});
+    }
+    out.push({type: "_objective_", human: "objectif : minimiser la distance au tableau (somme des rangs)"});
+    return out;
+}
+
 /**
  * Produit le SVG “vue prof” : miroir vertical, **textes lisibles**.
  *
@@ -144,7 +156,7 @@ function collectRoomSvgMarkupTeacher() {
     const ns = "http://www.w3.org/2000/svg";
     const g = document.createElementNS(ns, "g");
     // Rotation 180° : translate(W,H) puis scale(-1,-1)
-    g.setAttribute("transform", `translate(${W}, ${H}) scale(-1, -1)`);
+    g.setAttribute("transform", `translate(0, ${H}) scale(1, -1)`);
 
     // Déplacer tout (sauf <style> et fond blanc) dans le <g> pivot
     const children = Array.from(clone.childNodes);
@@ -172,28 +184,13 @@ function collectRoomSvgMarkupTeacher() {
         const hasX = xAttr != null && xAttr !== "";
         const hasY = yAttr != null && yAttr !== "";
 
-        if (hasX) {
-            const x0 = Number(xAttr);
-            if (Number.isFinite(x0)) t.setAttribute("x", String(-x0));
-        }
         if (hasY) {
             const y0 = Number(yAttr);
             if (Number.isFinite(y0)) t.setAttribute("y", String(-y0));
         }
-
         // Flip local pour remettre les glyphes à l'endroit (X et Y)
         const prev = t.getAttribute("transform") || "";
-        t.setAttribute("transform", `scale(-1,-1)${prev ? " " + prev : ""}`);
-
-        // IMPORTANT : les <tspan> avec un attribut x *absolu* écrasent le x du <text>
-        // → on négative également leurs x.
-        const tspans = t.querySelectorAll("tspan[x]");
-        tspans.forEach((sp) => {
-            const tx = sp.getAttribute("x");
-            if (tx == null || tx === "") return;
-            const x0 = Number(tx);
-            if (Number.isFinite(x0)) sp.setAttribute("x", String(-x0));
-        });
+        t.setAttribute("transform", `scale(1,-1)${prev ? " " + prev : ""}`);
 
         // NB : on ne touche pas aux dy/dx (relatifs) : le flip local gère le sens.
     });
@@ -225,14 +222,11 @@ export function buildExportPayload() {
         svg_markup_teacher: collectRoomSvgMarkupTeacher(),
         schema: state.schema,
         students: state.students.map((s) => ({
-            id: s.id,
-            name: s.name,
-            first: s.first,
-            last: s.last,
-            gender: s.gender ?? null,
+            id: s.id, name: s.name, first: s.first, last: s.last, gender: s.gender ?? null,
         })),
         options: state.options,
-        constraints: state.constraints,
+        // on concatène les “objectifs” pour qu’ils sortent dans le TXT
+        constraints: [...state.constraints, ...buildObjectiveMarkers()],
         forbidden: Array.from(state.forbidden),
         placements: Object.fromEntries(state.placements),
         name_view: state.nameView,

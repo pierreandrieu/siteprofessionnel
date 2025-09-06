@@ -186,3 +186,48 @@ class DoitEtreExactementIci(Contrainte):
     def regles_asp(self, ctx: ASPContext) -> list[str]:
         s = ctx.id_par_eleve[self.eleve]
         return [f":- not assign({s},{self.ou.x},{self.ou.y},{self.ou.siege})."]
+
+
+class DoitNePasAvoirVoisinAdjacent(Contrainte):
+    """
+    Interdit qu’un autre élève soit assis sur un siège *adjacent* à celui de l’élève,
+    sur la même table (|seat_i - seat_j| == 1).
+    """
+
+    def __init__(self, eleve: Eleve) -> None:
+        self.eleve: Eleve = eleve
+
+    def type_contrainte(self) -> TypeContrainte:
+        return TypeContrainte.NO_ADJACENT
+
+    def implique(self) -> Sequence[Eleve]:
+        return [self.eleve]
+
+    def est_satisfaite(self, affectation: Dict[Eleve, Position]) -> bool:
+        pos: Optional[Position] = affectation.get(self.eleve)
+        if pos is None:
+            return True
+        # On refuse dès qu’on trouve quelqu’un sur la même table ET siège adjacent
+        for autre, p in affectation.items():
+            if autre is self.eleve or p is None:
+                continue
+            if p.x == pos.x and p.y == pos.y and abs(p.siege - pos.siege) == 1:
+                return False
+        return True
+
+    def texte_humain(self) -> str:
+        return f"{self.eleve.affichage_nom()} ne doit avoir aucun voisin adjacent"
+
+    def code_machine(self) -> Dict[str, Any]:
+        return {"type": self.type_contrainte().value, "eleve": self.eleve.nom}
+
+    def regles_asp(self, ctx: ASPContext) -> Sequence[str]:
+        s = ctx.sid(self.eleve)
+        # “Il n’existe pas S2 adjacent à S sur la même table”
+        # encode via un interdit quand deux sièges adjacents de même (X,Y)
+        return [
+            # même table X, Y forcé implicitement par assign/assign
+            # |S1 - S2| == 1 sur la *même table*
+            f":- assign({s},X,Y,S1), assign(S2,X,Y,S2i), |S1-S2i| == 1, S2 != {s}."
+        ]
+

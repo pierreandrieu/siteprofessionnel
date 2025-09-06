@@ -15,6 +15,7 @@ class TypeContrainte(str, Enum):
     SEUL_A_TABLE = "solo_table"
     VOISIN_VIDE = "empty_neighbor"
     EXACT_SEAT = "exact_seat"
+    NO_ADJACENT = "no_adjacent"
 
     # Binaires (paire d'élèves)
     ELOIGNES = "far_apart"

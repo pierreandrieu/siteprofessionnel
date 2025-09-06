@@ -16,18 +16,18 @@ import {renderRoom, renderStudents, updateBanButtonLabel} from "./render.js";
    Eligibility (bouton "générer le plan")
    ========================================================================== */
 
-/** Retourne true si un schéma est défini et cohérent (≥1 rangée, ≥1 table/rangée, capacités >0). */
+/** Retourne true si au moins une table **/
 function schemaIsReady() {
     const sch = state.schema;
     if (!Array.isArray(sch) || sch.length === 0) return false;
     for (const row of sch) {
         if (!Array.isArray(row) || row.length === 0) return false;
-        for (const cap of row) {
-            if (!Number.isFinite(cap) || cap <= 0) return false;
-        }
+        const hasRealTable = row.some((cap) => Number.isFinite(cap) && cap > 0);
+        if (!hasRealTable) return false;
     }
     return true;
 }
+
 
 /** Retourne true si au moins 1 élève est chargé. */
 function studentsAreLoaded() {
@@ -49,17 +49,7 @@ export function syncSolveButtonEnabled() {
     const hasStudents = Array.isArray(state.students) && state.students.length > 0;
 
     // --- Vérifie qu'un schéma valide est défini (>= 1 rangée, capacités > 0) ---
-    const hasSchema = (function schemaIsReady() {
-        const sch = state.schema;
-        if (!Array.isArray(sch) || sch.length === 0) return false;
-        for (const row of sch) {
-            if (!Array.isArray(row) || row.length === 0) return false;
-            for (const cap of row) {
-                if (!Number.isFinite(cap) || cap <= 0) return false;
-            }
-        }
-        return true;
-    })();
+    const hasSchema = schemaIsReady();
 
     // --- État final : prêt si élèves + schéma ---
     const ready = hasStudents && hasSchema;
@@ -137,17 +127,17 @@ export function setupSolveUI() {
 export function buildSolvePayload() {
     return {
         schema: state.schema,
-        students: state.students.map((s) => ({
+        students: state.students.map(s => ({
             id: s.id,
             name: s.name,
             first: s.first,
             last: s.last,
-            gender: s.gender || null,
+            gender: s.gender || null
         })),
-        options: state.options,
+        options: {...state.options, respect_existing: false}, // 👈
         constraints: state.constraints,
         forbidden: Array.from(state.forbidden),
-        placements: Object.fromEntries(state.placements),
+        placements: {}, // 👈 libère les sièges (ou ne mets ici que les “verrouillés” si tu as cette notion)
         name_view: state.nameView,
     };
 }

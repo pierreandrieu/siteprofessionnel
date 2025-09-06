@@ -199,7 +199,10 @@ export function renderRoom() {
 
     // Largeurs de rangée (centrage)
     const rowWidths = state.schema.map((caps) => {
-        const tablesW = caps.reduce((sum, cap) => sum + cap * seatW + (cap - 1) * seatGap, 0);
+        const tablesW = caps.reduce((sum, cap) => {
+            const c = Math.abs(cap); //  compte aussi la largeur des trous
+            return sum + c * seatW + (c - 1) * seatGap;
+        }, 0);
         const between = (caps.length - 1) * colGap;
         return tablesW + between;
     });
@@ -261,8 +264,9 @@ export function renderRoom() {
 
     const boardLabel = document.createElementNS(ns, "text");
     boardLabel.setAttribute("x", String(boardX + boardW / 2));
-    boardLabel.setAttribute("y", String(boardY - 4));
+    boardLabel.setAttribute("y", String(boardY + boardH / 2));
     boardLabel.setAttribute("text-anchor", "middle");
+    boardLabel.setAttribute("dominant-baseline", "middle");
     boardLabel.setAttribute("class", "board-label");
     boardLabel.textContent = "TABLEAU";
     svg.appendChild(boardLabel);
@@ -271,8 +275,10 @@ export function renderRoom() {
 
     for (let y = 0; y < rows; y++) {
         const caps = state.schema[y];
-        const tablesW = caps.reduce((sum, cap) => sum + cap * seatW + (cap - 1) * seatGap, 0);
-        const between = (caps.length - 1) * colGap;
+        const tablesW = caps.reduce((sum, cap) => {
+            const c = Math.abs(cap); // pour bien centrer chaque rangée
+            return sum + c * seatW + (c - 1) * seatGap;
+        }, 0);        const between = (caps.length - 1) * colGap;
         const rowW = tablesW + between;
         let ox = padX + (maxRowW - rowW) / 2;
         const oy = rowOriginsY[y];
@@ -280,6 +286,17 @@ export function renderRoom() {
         for (let x = 0; x < caps.length; x++) {
             const cap = caps[x];
             const tableWidth = cap * seatW + (cap - 1) * seatGap;
+
+            if (cap < 0) {
+                const k = Math.abs(cap);
+                // largeur "équivalente" à k sièges alignés (même métrique que pour une table)
+                const spacerWidth = k * seatW + (k - 1) * seatGap;
+
+                // Avance le curseur horizontal comme si on avait une table
+                ox += spacerWidth + colGap;
+                continue; //  important : pas de sièges/labels/dividers
+            }
+
 
             const rect = document.createElementNS(ns, "rect");
             rect.setAttribute("x", String(ox));

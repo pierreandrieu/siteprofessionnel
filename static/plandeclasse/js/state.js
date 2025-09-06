@@ -28,6 +28,8 @@
  * @property {number} [d]
  * @property {string} [human]
  * @property {string} [key]
+ * @property {string} type  // "front_rows" | "back_rows" | "solo_table" | "empty_neighbor" | "no_adjacent" | "same_table" | "far_apart" | "forbid_seat"
+ *
  */
 
 /**

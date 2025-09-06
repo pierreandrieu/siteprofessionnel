@@ -98,8 +98,11 @@
 
                             <!-- Col 3 : boutons sur la même ligne -->
                             <div class="col-12 col-md-3 col-lg-3 d-flex justify-content-md-end gap-2">
-                                <button id="btnBuildRoom" class="btn btn-primary">valider</button>
+                                <button id="btnAddRow" class="btn btn-primary">ajouter</button>
                             </div>
+                            <button id="btnResetRoomSchema" class="btn btn-outline-danger">
+                                Réinitialiser la salle
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -276,6 +279,11 @@
             </div>
         </div>
 
+        <div class="form-check form-switch ms-auto">
+            <input class="form-check-input" type="checkbox" id="optLockPlacements" checked>
+            <label class="form-check-label" for="optLockPlacements">verrouiller mes placements</label>
+        </div>
+
         <!-- ===== Étape 4 ===== -->
         <div class="bg-light border rounded px-3 py-2 my-3 d-flex align-items-center">
             <span class="badge text-bg-primary me-2">Étape 4</span>
@@ -333,29 +341,40 @@
                                     <option value="back_rows">dans les 'k' dernières rangées</option>
                                     <option value="solo_table">seul(s) sur sa/leur table</option>
                                     <option value="empty_neighbor">au moins un siège vide à côté</option>
+                                    <option value="no_adjacent">pas de voisin</option>
                                     <option value="same_table">à la même table</option>
                                     <option value="far_apart">distance d'au moins 'd' deux à deux </option>
                                 </select>
                             </div>
 
                             <!-- Paramètre (k ou d) -->
-                            <div class="col-12 col-sm-6 col-lg-2" id="cstParamWrap" hidden>
+                            <div class="col-12 col-sm-6 col-lg-2" id="cstParamCol">
                                 <label class="form-label is-header" id="cstParamLabel">Paramètre</label>
-                                <input id="cstParam" type="number" min="1"
-                                       class="form-control form-control-sm param-input" inputmode="numeric"
-                                       placeholder="">
-                                <div class="form-text" id="cstParamHelp"></div>
+                                <div id="cstParamInner">
+                                    <input id="cstParam" type="number" min="1"
+                                           class="form-control form-control-sm param-input"
+                                           inputmode="numeric" placeholder="">
+                                    <div class="form-text" id="cstParamHelp"></div>
+                                </div>
+                            </div>
+                            <!-- Actions -->
+                            <div class="col-12 col-lg-2 col-actions text-lg-end">
+                                <!-- garde l’espace des titres sur sm+ -->
+                                <label class="form-label is-header invisible d-none d-sm-block">actions</label>
+
+                                <!-- mt-sm-2 (ou mt-sm-3 selon ton rendu) pour amener le bouton à la
+                                     même hauteur que le haut des inputs sous les labels -->
+                                <button class="btn btn-sm btn-primary mt-sm-2" type="button" id="btnAddConstraint">
+                                    ajouter contrainte
+                                </button>
                             </div>
 
-                            <!-- Actions -->
-                            <div class="col-12 col-lg-2 col-actions">
-                                <div class="btn-row">
-                                    <button class="btn btn-sm btn-primary" type="button" id="btnAddConstraint">ajouter
-                                        contrainte
-                                    </button>
+
+                            <!-- ancien bouton
                                     <button class="btn btn-sm btn-outline-secondary" type="button"
                                             id="btnCancelConstraint">réinitialiser
                                     </button>
+                                    -->
                                     
                                 </div>
                             </div>
@@ -379,7 +398,11 @@
       <button id="btnSolve" class="btn btn-success" type="button" disabled>
         générer le plan de classe avec les contraintes ci-dessous
       </button>
-      <button id="btnClearRoom" class="btn btn-outline-secondary">réinitialiser la salle</button>
+  <button id="btnResetPlan" class="btn btn-outline-secondary"
+          data-bs-toggle="tooltip"
+          title="Enlève tous les élèves placés, mais conserve la salle, les contraintes et les sièges interdits.">
+    Réinitialiser le plan
+  </button>
     </span>
                             <div id="solveStatus" class="small text-muted"></div>
                         </div>

@@ -21,6 +21,18 @@ function getStudentsSorted() {
     return [...state.students].sort(compareByLastThenFirst);
 }
 
+function buildObjectiveMarkers() {
+    const out = [];
+    if (state.options.prefer_alone) {
+        out.push({type: "_objective_", human: "objectif : maximiser les élèves sans voisin"});
+    }
+    if (state.options.prefer_mixage) {
+        out.push({type: "_objective_", human: "objectif : minimiser les paires adjacentes de même genre"});
+    }
+    out.push({type: "_objective_", human: "objectif : minimiser la distance au tableau (somme des rangs)"});
+    return out;
+}
+
 /**
  * Retourne la sélection d'élèves en tenant compte du fallback mobile.
  * - Desktop (≥ sm) : lit le <select multiple>
@@ -148,34 +160,65 @@ export function refreshConstraintSelectors() {
 
 export function onConstraintTypeChange() {
     const t = /** @type {HTMLSelectElement} */ ($("#constraintType")).value;
-    const pWrap = $("#cstParamWrap");
     const pLabel = $("#cstParamLabel");
     const pHelp = $("#cstParamHelp");
     const pInput = /** @type {HTMLInputElement} */ ($("#cstParam"));
 
-    const needsK = ["front_rows", "back_rows"].includes(t);
-    const needsD = t === "far_apart";
+    // Supporte #cstParamInner (nouveau) ou #cstParamWrap (ancien)
+    const inner = document.getElementById("cstParamInner") || document.getElementById("cstParamWrap");
 
-    pWrap.hidden = !(needsK || needsD);
+    const needsK = (t === "front_rows" || t === "back_rows");
+    const needsD = (t === "far_apart");
+
+    // (dé)masque le bloc paramètre sans casser la grille
+    if (inner) {
+        if (needsK || needsD) {
+            inner.classList?.remove("d-none");
+            inner.removeAttribute?.("hidden");
+        } else {
+            inner.classList?.add("d-none");
+            if (inner.id === "cstParamWrap") inner.setAttribute?.("hidden", "true");
+        }
+    }
 
     if (needsK) {
         pLabel.textContent = "k (nombre de rangées)";
-        pInput.value = "1";
         pInput.min = "1";
         pInput.removeAttribute("max");
+        pInput.step = "1";
+        pInput.value = "1";
         pHelp.textContent = "";
-    } else if (needsD) {
-        const maxD = computeMaxManhattan(state.schema);
-        pLabel.textContent = "distance d (Manhattan)";
-        pInput.value = "2";
-        pInput.min = "2";
-        pInput.max = String(Math.max(2, maxD));
-        pHelp.textContent = maxD > 0 ? `valeur ≤ ${maxD} pour cette salle` : "";
-    } else {
-        pLabel.textContent = "paramètre";
-        pInput.placeholder = "";
-        pHelp.textContent = "";
+        return;
     }
+
+    if (needsD) {
+        const maxD = computeMaxManhattan(state.schema); // peut être 0 si salle pas prête
+        pLabel.textContent = "distance d (Manhattan)";
+        pInput.min = "2";
+        pInput.step = "1";
+
+        // On n’impose *pas* de max si maxD ≤ 2 ou inconnu, pour laisser les flèches monter.
+        if (Number.isFinite(maxD) && maxD >= 3) {
+            pInput.max = String(maxD);
+            pHelp.textContent = `valeur ≤ ${maxD} pour cette salle`;
+        } else {
+            pInput.removeAttribute("max");
+            pHelp.textContent = ""; // ou un message indicatif si tu veux
+        }
+
+        // Valeur par défaut = 2, mais si l’utilisateur avait déjà saisi >2, on garde.
+        const cur = Number(pInput.value);
+        pInput.value = (Number.isFinite(cur) && cur >= 2) ? String(cur) : "2";
+        return;
+    }
+
+    // Pas de paramètre
+    pLabel.textContent = "Paramètre";
+    pInput.value = "";
+    pInput.removeAttribute("min");
+    pInput.removeAttribute("max");
+    pInput.removeAttribute("step");
+    pHelp.textContent = "";
 }
 
 /**
@@ -191,7 +234,7 @@ export function addConstraint() {
     const t = /** @type {HTMLSelectElement} */ (document.getElementById("constraintType")).value;
     const selectedIds = getSelectedStudentIds();
 
-    const isUnary = ["front_rows", "back_rows", "solo_table", "empty_neighbor"].includes(t);
+    const isUnary = ["front_rows", "back_rows", "solo_table", "empty_neighbor", "no_adjacent"].includes(t);
     const isBinary = ["same_table", "far_apart"].includes(t);
 
     if (isUnary && selectedIds.length === 0) {
@@ -226,6 +269,9 @@ export function addConstraint() {
         case "empty_neighbor":
             batch_human = `${namesPlural} doivent avoir au moins un siège vide à côté`;
             break;
+        case "no_adjacent":
+            batch_human = `${namesPlural} ne doivent avoir aucun voisin adjacent`;
+            break;
         case "same_table":
             batch_human = `${namesPlural} doivent être à la même table`;
             break;
@@ -258,7 +304,6 @@ export function addConstraint() {
     renderConstraints();
 }
 
-
 /* ==========================================================================
    Rendu + suppression (gère les lots)
    ========================================================================== */
@@ -274,7 +319,14 @@ export function renderConstraints() {
     if (!root) return;
     root.innerHTML = "";
 
-    // 1) Rendre d’abord les lots (marqueurs)
+    for (const m of buildObjectiveMarkers()) {
+        const item = document.createElement("div");
+        item.className = "constraint-pill me-2 mb-2 d-inline-flex align-items-center gap-2";
+        item.textContent = m.human;
+        root.appendChild(item);
+    }
+
+    // Rendre les lots (marqueurs)
     const markers = state.constraints.filter(c => c.type === "_batch_marker_");
     for (const m of markers) {
         const item = document.createElement("div");
@@ -291,35 +343,6 @@ export function renderConstraints() {
             renderConstraints();
             updateBanButtonLabel();
             renderRoom(); // au cas où certaines contraintes influencent un futur rendu
-        });
-
-        item.appendChild(del);
-        root.appendChild(item);
-    }
-
-    // 2) Afficher les contraintes “simples” (non lot, y compris forbid_seat)
-    for (const c of state.constraints) {
-        if (c.type === "_batch_marker_") continue; // déjà rendu
-        if (c.batch_id) continue; // masqué car représenté par le marqueur
-
-        const item = document.createElement("div");
-        item.className = "constraint-pill me-2 mb-2 d-inline-flex align-items-center gap-2";
-        item.textContent = c.human || JSON.stringify(c);
-
-        const del = document.createElement("button");
-        del.className = "btn btn-sm btn-outline-danger";
-        del.textContent = "✕";
-        del.addEventListener("click", () => {
-            const idx = state.constraints.indexOf(c);
-            if (idx >= 0) {
-                if (c.type === "forbid_seat" && typeof c.x === "number") {
-                    state.forbidden.delete(keyOf(c.x, c.y, c.s));
-                    renderRoom();
-                }
-                state.constraints.splice(idx, 1);
-                renderConstraints();
-                updateBanButtonLabel();
-            }
         });
 
         item.appendChild(del);

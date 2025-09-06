@@ -303,3 +303,11 @@
 #cstStudentsMobile input[type="checkbox"] {
     transform: scale(1.05);
 }
+
+/* plandeclasse.css */
+@media (min-width: 576px) {
+    .constraints-grid .is-header {
+        display: block;
+        min-height: 1.5rem;
+    }
+}

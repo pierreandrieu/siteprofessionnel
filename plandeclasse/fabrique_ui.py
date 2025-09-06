@@ -63,12 +63,14 @@ def fabrique_contraintes_ui(
 
         # plandeclasse/fabrique_ui.py  (in the unaires branch)
         # ...
-        if typ in {TypeContrainte.PREMIERES_RANGEES.value,
-                   TypeContrainte.DERNIERES_RANGEES.value,
-                   TypeContrainte.SEUL_A_TABLE.value,
-                   TypeContrainte.VOISIN_VIDE.value,
-                   TypeContrainte.EXACT_SEAT.value}:
-
+        if typ in {
+            TypeContrainte.PREMIERES_RANGEES.value,
+            TypeContrainte.DERNIERES_RANGEES.value,
+            TypeContrainte.SEUL_A_TABLE.value,
+            TypeContrainte.VOISIN_VIDE.value,
+            TypeContrainte.NO_ADJACENT.value,
+            TypeContrainte.EXACT_SEAT.value,
+        }:
             # accept 'eleve' | 'a' | 'studentId'
             sid_raw = c.get("eleve", c.get("a", c.get("studentId")))
             if sid_raw is None:
