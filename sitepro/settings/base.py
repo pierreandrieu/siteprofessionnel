@@ -1,5 +1,7 @@
 from pathlib import Path
 import os
+from csp.constants import NONCE 
+
 
 
 def _level(env_name: str, default: str = "INFO") -> str:
@@ -40,10 +42,22 @@ MIDDLEWARE = [
     "csp.middleware.CSPMiddleware",
 ]
 
-CSP_DEFAULT_SRC = ("'self'",)
-CSP_SCRIPT_SRC  = ("'self'",)
-CSP_STYLE_SRC   = ("'self'",)
-CSP_IMG_SRC     = ("'self'", "data:")
+
+
+CONTENT_SECURITY_POLICY = {
+    "DIRECTIVES": {
+        "default-src": ["'self'"],
+        "script-src": ["'self'", NONCE],
+        "style-src": ["'self'"],
+        "img-src": ["'self'", "data:"],
+	"frame-ancestors": ["'self'"],
+        "font-src": ["'self'"],
+        "connect-src": ["'self'"],          # fetch/WebSocket/API
+        "object-src": ["'none'"],           # pas d’<object>/<embed>
+        "base-uri": ["'self'"],
+
+    }
+}
 
 
 # Fichiers statiques : hash + compression (cache long côté client)
