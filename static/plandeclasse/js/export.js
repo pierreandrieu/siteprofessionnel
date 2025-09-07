@@ -156,7 +156,7 @@ function collectRoomSvgMarkupTeacher() {
     const ns = "http://www.w3.org/2000/svg";
     const g = document.createElementNS(ns, "g");
     // Rotation 180° : translate(W,H) puis scale(-1,-1)
-    g.setAttribute("transform", `translate(0, ${H}) scale(1, -1)`);
+    g.setAttribute("transform", `translate(${W}, ${H}) scale(-1, -1)`);
 
     // Déplacer tout (sauf <style> et fond blanc) dans le <g> pivot
     const children = Array.from(clone.childNodes);
@@ -179,22 +179,22 @@ function collectRoomSvgMarkupTeacher() {
     texts.forEach((t) => {
         const xAttr = t.getAttribute("x");
         const yAttr = t.getAttribute("y");
-
-        // On ne touche qu'aux textes positionnés ; prudence en cas de valeurs non numériques
-        const hasX = xAttr != null && xAttr !== "";
-        const hasY = yAttr != null && yAttr !== "";
-
-        if (hasY) {
+        if (xAttr != null && xAttr !== "") {
+            const x0 = Number(xAttr);
+            if (Number.isFinite(x0)) t.setAttribute("x", String(-x0));
+        }
+        if (yAttr != null && yAttr !== "") {
             const y0 = Number(yAttr);
             if (Number.isFinite(y0)) t.setAttribute("y", String(-y0));
         }
-        // Flip local pour remettre les glyphes à l'endroit (X et Y)
+            // Si des <tspan> portent un x, on les retourne aussi
+            t.querySelectorAll("tspan[x]").forEach((ts) => {
+                const xx = Number(ts.getAttribute("x"));
+                if (Number.isFinite(xx)) ts.setAttribute("x", String(-xx));
+            });
         const prev = t.getAttribute("transform") || "";
-        t.setAttribute("transform", `scale(1,-1)${prev ? " " + prev : ""}`);
-
-        // NB : on ne touche pas aux dy/dx (relatifs) : le flip local gère le sens.
+        t.setAttribute("transform", `scale(-1,-1)${prev ? " " + prev : ""}`);
     });
-
     return serializeSvg(clone);
 }
 
