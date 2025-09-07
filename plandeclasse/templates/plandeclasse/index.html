@@ -10,141 +10,126 @@
     <div id="pc-root" class="container-fluid py-3">
         <h1 class="h4 mb-3">Outil de génération de plan de classe sous contraintes</h1>
 
-        <!-- ===== Étape 1 ===== -->
-        <div class="bg-light border rounded px-3 py-2 my-3 d-flex align-items-center">
-            <span class="badge text-bg-primary me-2">Étape 1</span>
-            <strong>chargement des données élèves</strong>
-            <span id="step1Status" class="badge text-bg-secondary ms-auto">à faire</span>
-        </div>
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <!-- Header : titre + bouton d’aide juste dessous -->
+                <div class="card-header py-2">
+                    <strong class="d-block mb-1">données élèves (CSV ou JSON)</strong>
+                    <a class="btn btn-sm btn-outline-primary"
+                       data-bs-toggle="collapse"
+                       href="#pcHelpLoad"
+                       role="button"
+                       aria-expanded="false"
+                       aria-controls="pcHelpLoad">
+                        🛈 Comment charger les données ?
+                    </a>
+                </div>
 
-        <div class="row g-3">
-            <!-- Données élèves (CSV / JSON) -->
-            <div class="col-12">
-                <div class="card shadow-sm">
-                    <div class="card-header py-2">
-                        <strong>données élèves (CSV ou JSON)</strong>
+                <!-- Aide repliable (harmonisée avec Étape 2) -->
+                <div class="card-body pb-0">
+                    <div id="pcHelpLoad" class="collapse w-100 mb-3">
+                        <div class="pc-help small">
+                            <ul class="mb-2">
+                                <li>
+                                    <strong>CSV Pronote</strong> : <em>Mes données → Liste des élèves</em> → choisir la
+                                    classe → cliquer sur
+                                    « copier la liste (format CSV) » <span
+                                        class="d-none d-sm-inline">(icône ci-dessous)</span>.
+                                    <div class="d-none d-sm-inline-block mt-1">
+                                        <img src="{% static 'bouton_export_csv.png' %}"
+                                             alt="bouton export CSV Pronote"
+                                             style="height:50px;opacity:.9">
+                                    </div>
+                                    Puis sélectionnez le fichier ici.
+                                </li>
+                                <li class="mt-1">
+                                    <strong>JSON plandeclasse</strong> : importez un fichier <code>.json</code>
+                                    précédemment exporté depuis cet outil (il recharge élèves + options).
+                                </li>
+                            </ul>
+                            <div class="text-muted">Astuce : le nom du fichier choisi apparaît juste sous le champ
+                                d’import.
+                            </div>
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <div class="row g-3 align-items-start">
-                            <div class="col-12 col-sm-7 col-md-6 col-lg-5">
-                                <input id="csvInput" class="form-control w-100" type="file" accept=".csv,.json">
-                                <div id="csvFilename" class="form-text mt-1 text-truncate">Aucun fichier</div>
-                            </div>
+                </div>
 
-                            <div class="col">
-                                <div class="small text-muted">
-                                    <strong>Deux façons de charger les données :</strong>
-                                    <ul class="mb-2 mt-1">
-                                        <li>
-                                            <strong>CSV Pronote</strong> : <em>Mes données → Liste des élèves</em> →
-                                            choisir la classe → cliquer
-                                            sur « copier la liste (format CSV) » dont
-                                            l'icône est
-                                            <div class="d-none d-sm-inline-block">
-                                                <img src="{% static 'bouton_export_csv.png' %}"
-                                                     alt="bouton export CSV pronote"
-                                                     style="height:50px;opacity:.9">
-                                            </div> puis sélectionner le fichier ici
-                                        </li>
-                                        <li>
-                                            <strong>JSON plandeclasse</strong> : sélectionnez le fichier
-                                            <code>.json</code> précédemment exporté
-                                            depuis cet outil
-                                        </li>
-                                    </ul>
-                                </div>
+                <!-- Formulaire d’import -->
+                <div class="card-body">
+                    <div class="row g-3 align-items-start">
+                        <div class="col-12 col-sm-7 col-md-6 col-lg-5">
+                            <input id="csvInput" class="form-control w-100" type="file" accept=".csv,.json">
+                            <div id="csvFilename" class="form-text mt-1 text-truncate">Aucun fichier</div>
+                        </div>
+
+                        <div class="col">
+                            <div class="small text-muted">
+                                Vous pouvez charger un CSV (Pronote) ou un JSON (export plandeclasse).
                             </div>
-                        </div> <!-- /row -->
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- ===== Étape 2 ===== -->
-        <div class="bg-light border rounded px-3 py-2 my-3 d-flex align-items-center">
-            <span class="badge text-bg-primary me-2">Étape 2</span>
-            <strong>donner la disposition de la salle</strong>
-            <span id="step2Status" class="badge text-bg-secondary ms-auto">à faire</span>
-        </div>
 
-        <div class="row g-3">
-            <!-- Configuration de la salle (séparée) -->
-            <div class="col-12">
-                <div class="card shadow-sm">
-                    <div class="card-header py-2 d-flex align-items-center justify-content-between">
-                        <strong class="mb-0">configuration de la salle</strong>
-                        <a class="link-secondary small ms-3"
-                           data-bs-toggle="collapse"
-                           href="#pcHelpRows"
-                           role="button"
-                           aria-expanded="false"
-                           aria-controls="pcHelpRows">
-                            🛈 Comment saisir la disposition ?
-                        </a>
+        <div class="card shadow-sm">
+            <!-- Header : titre + lien d’aide en dessous -->
+            <div class="card-header py-2">
+                <strong class="d-block mb-1">configuration de la salle</strong>
+                <a class="btn btn-sm btn-outline-primary"
+                   data-bs-toggle="collapse"
+                   href="#pcHelpLoad"
+                   role="button"
+                   aria-expanded="false"
+                   aria-controls="pcHelpLoad">
+                    🛈 Comment saisir la disposition ?
+                </a>
+            </div>
+
+            <!-- Aide repliable sous le header -->
+            <div class="card-body">
+                <div id="pcHelpRows" class="collapse w-100 mb-3">
+                    <div class="pc-help small">
+                        <ul class="mb-2">
+                            <li><strong>Format :</strong> entiers séparés par des virgules pour une <em>rangée</em>.
+                            </li>
+                            <li><code>2,3,2</code> → ⟦□□⟧⟦□□□⟧⟦□□⟧ (tables de 2, puis 3, puis 2).</li>
+                            <li><code>2,-3,2</code> → ⟦□□⟧ ⟦···⟧ ⟦□□⟧ (un <em>vide</em>/allée de 3 sièges).</li>
+                        </ul>
+                        <div class="text-muted">NB : “ajouter” duplique cette rangée selon « nombre de rangées ».</div>
+                    </div>
+                </div>
+
+                <!-- Formulaire de configuration -->
+                <div class="row g-2 align-items-end">
+                    <div class="col-12 col-md-3 col-lg-2">
+                        <label class="form-label mb-1" for="rowsCount">nombre de rangées</label>
+                        <input id="rowsCount" type="number" min="1" max="20" value="5"
+                               class="form-control w-auto" style="max-width:140px">
                     </div>
 
-                    <div class="card-body">
-                        <!-- Panneau d'aide sous le header -->
-                        <div id="pcHelpRows" class="collapse w-100 mb-3">
-                            <div class="pc-help small">
-                                <ul class="mb-2">
-                                    <li><strong>Format :</strong> entiers séparés par des virgules pour une
-                                        <em>rangée</em>.
-                                    </li>
-                                    <li><code>2,3,2</code> → ⟦□□⟧⟦□□□⟧⟦□□⟧ (tables de 2, puis 3, puis 2).</li>
-                                    <li><code>2,-3,2</code> → ⟦□□⟧ ⟦···⟧ ⟦□□⟧ (un <em>vide</em>/allée de 3 sièges).</li>
-                                </ul>
-                                <div class="text-muted">NB : “ajouter” duplique cette rangée selon « nombre de rangées
-                                    ».
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- le reste de ta mise en page (row g-2…) -->
-                        <div class="row g-2 align-items-end">
-                            <!-- … -->
-                        </div>
+                    <div class="col-12 col-md-6 col-lg-7">
+                        <label class="form-label mb-1" for="rowCapacities">
+                            capacités des tables d'une rangée (ex : 2,3,2)
+                        </label>
+                        <input id="rowCapacities" class="form-control" value="2,3,2">
                     </div>
 
-                    <div class="card-body">
-                        <div class="row g-2 align-items-end">
-                            <!-- Col 1 : nombre de rangées (champ étroit) -->
-                            <div class="col-12 col-md-3 col-lg-2">
-                                <label class="form-label mb-1" for="rowsCount">nombre de rangées</label>
-                                <input id="rowsCount" type="number" min="1" max="20" value="5"
-                                       class="form-control w-auto" style="max-width:140px">
-                            </div>
+                    <div class="col-12 col-md-3 col-lg-3 d-flex justify-content-md-end gap-2">
+                        <button id="btnAddRow" class="btn btn-primary">ajouter</button>
+                    </div>
 
-                            <!-- Col 2 : capacités -->
-                            <div class="col-12 col-md-6 col-lg-7">
-                                <label class="form-label mb-1 d-inline-flex align-items-center gap-2"
-                                       for="rowCapacities">
-                                    capacités des tables d'une rangée (ex : 2,3,2)
-                                    <button type="button" class="btn btn-link p-0 lh-1 text-decoration-none"
-                                            data-bs-toggle="tooltip"
-                                            title="Ex. « 2,3,2 » : une rangée avec 3 tables de 2, 3 et 2 sièges.">?
-                                    </button>
-                                </label>
-                                <input id="rowCapacities" class="form-control" value="2,3,2">
-                            </div>
+                    <button id="btnResetRoomSchema" class="btn btn-outline-danger">Réinitialiser la salle</button>
 
-                            <!-- Col 3 : boutons sur la même ligne -->
-                            <div class="col-12 col-md-3 col-lg-3 d-flex justify-content-md-end gap-2">
-                                <button id="btnAddRow" class="btn btn-primary">ajouter</button>
-                            </div>
-                            <button id="btnResetRoomSchema" class="btn btn-outline-danger">
-                                Réinitialiser la salle
-                            </button>
-                            <hr class="my-3">
-                            <div>
-                                <div class="d-flex align-items-center justify-content-between mb-2">
-                                    <span class="fw-semibold">rangées actuelles</span>
-                                    <small class="text-muted">(cliquer sur 🗑 pour supprimer une rangée)</small>
-                                </div>
-                                <div id="rowsEditor" class="vstack gap-2"></div>
-                            </div>
+                    <hr class="my-3">
 
+                    <div>
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="fw-semibold">rangées actuelles</span>
+                            <small class="text-muted">(cliquer sur 🗑 pour supprimer une rangée)</small>
                         </div>
+                        <div id="rowsEditor" class="vstack gap-2"></div>
                     </div>
                 </div>
             </div>
@@ -160,8 +145,13 @@
             <div class="w-100"></div>
 
             <!-- Lien d’aide + panneau en dessous -->
-            <a class="link-secondary small" data-bs-toggle="collapse" href="#pcHelpStep3" role="button"
-               aria-expanded="false" aria-controls="pcHelpStep3">🛈 Comment ça fonctionne ?</a>
+            <a class="btn btn-sm btn-outline-primary"
+               data-bs-toggle="collapse"
+               href="#pcHelpLoad"
+               role="button"
+               aria-expanded="false"
+               aria-controls="pcHelpLoad">🛈 Comment (pré)remplir manuellement le plan de classe ?
+            </a>
 
             <div class="collapse w-100 mt-2" id="pcHelpStep3">
                 <div class="pc-help small">
@@ -321,11 +311,69 @@
         </div>
 
         <!-- ===== Étape 4 ===== -->
-        <div class="bg-light border rounded px-3 py-2 my-3 d-flex align-items-center">
-            <span class="badge text-bg-primary me-2">Étape 4</span>
-            <strong>saisie des contraintes (facultatif)</strong>
-            <span id="step4Status" class="badge text-bg-secondary ms-auto">facultatif</span>
+        <div class="card-header py-2 d-flex align-items-center justify-content-between">
+            <strong class="mb-0">contraintes</strong>
+            <a class="btn btn-sm btn-outline-primary"
+               data-bs-toggle="collapse"
+               href="#pcHelpConstraints"
+               role="button"
+               aria-expanded="false"
+               aria-controls="pcHelpConstraints">
+                🛈 Comment utiliser les contraintes ?
+            </a>
         </div>
+
+        <!-- Helper Étape 4 : Mode d’emploi des contraintes -->
+        <div class="mb-2">
+            <a class="btn btn-sm btn-outline-primary"
+               data-bs-toggle="collapse"
+               href="#pcHelpConstraints"
+               role="button"
+               aria-expanded="false"
+               aria-controls="pcHelpConstraints">
+                🛈 Mode d’emploi des contraintes
+            </a>
+        </div>
+
+        <div id="pcHelpConstraints" class="collapse w-100 mt-2">
+            <div class="pc-help small">
+                <ul class="mb-2">
+                    <li><strong>Étape&nbsp;1 — Sélectionner le groupe d’élèves concernés</strong> :
+                        <span class="d-inline-block">Ctrl (Windows/Linux) <em>ou</em> ⌘ (macOS) pour ajouter/retirer,</span>
+                        <span class="d-inline-block">Maj pour sélectionner une plage ; sur mobile, cocher les cases.</span>
+                    </li>
+                    <li><strong>Étape&nbsp;2 — Choisir le type de règle</strong> dans la liste.</li>
+                    <li><strong>Étape&nbsp;3 — Renseigner le paramètre</strong> si demandé :
+                        <code>k</code> (nombre de rangées) ou <code>d</code> (distance minimale).
+                    </li>
+                    <li><strong>Étape&nbsp;4 — Ajouter</strong> la contrainte.</li>
+                </ul>
+
+                <ul class="mb-2">
+                    <li><u>Règles appliquées à chaque élève sélectionné</u> :
+                        premières rangées (<code>k</code>), dernières rangées (<code>k</code>),
+                        seul sur la table, au moins un siège vide, pas de voisin.
+                    </li>
+
+                    <li><u>Règles appliquées à toutes les paires d'élèves sélectionnés</u> :
+                        même table, distance d’au moins <code>d</code>.
+                        <div class="text-muted mt-1">
+                            Exemple&nbsp;: groupe {Alice, Ben, Chloé, David} avec «&nbsp;distance ≥&nbsp;3&nbsp;».<br>
+                            Les paires vérifiées sont&nbsp;: (Alice–Ben), (Alice–Chloé), (Alice–David),
+                            (Ben–Chloé), (Ben–David), (Chloé–David). Chacune doit être séparée d’au moins 3 «&nbsp;pas&nbsp;» selon la
+                            <a href="https://fr.wikipedia.org/wiki/Distance_de_Manhattan" target="_blank"
+                               rel="noopener">distance de Manhattan</a>).
+                        </div>
+                    </li>
+                </ul>
+
+                <div class="text-muted">
+                    NB&nbsp;: chaque ajout de contraintes crée un «&nbsp;lot&nbsp;». Cliquer sur ✕ sur la pastille supprime tout le
+                    lot en une fois.
+                </div>
+            </div>
+        </div>
+
 
         <!-- Contraintes -->
         <div class="row g-3 mt-3">
