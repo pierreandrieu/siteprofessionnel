@@ -8,6 +8,7 @@ from django.http import HttpResponse
 from django.urls import include, path
 from django.views.generic import TemplateView
 
+from sitepro.importmap import importmap_view
 from sitepro.views import importmap_json
 
 
@@ -33,7 +34,7 @@ urlpatterns = [
         name="robots_txt",
     ),
     path("healthz", healthz),
-    path("importmap.json", importmap_json, name="importmap"),
+    path("importmap", importmap_view, name="importmap"),
 
 ]
 

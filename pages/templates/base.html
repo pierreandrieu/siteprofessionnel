@@ -5,42 +5,35 @@
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
     <title>{% block title %}site pro{% endblock %}</title>
-
-    <!-- Bootstrap 5 -->
+    <!-- bootstrap 5 (cdn) -->
     <link rel="stylesheet" href="{% static 'vendor/bootstrap/5.3.7/css/bootstrap.min.css' %}">
-
-    <!-- CSS perso -->
+    <!-- css perso -->
     <link rel="stylesheet" href="{% static 'css/custom.css' %}">
     {% block extra_css %}{% endblock %}
-
-    <!-- Icônes -->
     <link rel="icon" href="{% static 'favicon.svg' %}" type="image/svg+xml">
     <link rel="alternate icon" href="{% static 'favicon.ico' %}" sizes="any">
     <link rel="apple-touch-icon" href="{% static 'apple-touch-icon.png' %}">
+
 </head>
 <body>
 <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
     <div class="container">
         <a class="navbar-brand" href="{% url 'pages:home' %}">Pierre Andrieu - NSI / SNT</a>
-
-        <button class="navbar-toggler" type="button"
-                data-bs-toggle="collapse" data-bs-target="#nav"
-                aria-controls="nav" aria-expanded="false" aria-label="menu">
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav" aria-controls="nav"
+                aria-expanded="false" aria-label="menu">
             <span class="navbar-toggler-icon"></span>
         </button>
+        <ul class="navbar-nav ms-auto">
+            <li class="nav-item"><a class="nav-link" href="{% url 'pages:home' %}">Accueil</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'cours:index' %}">Cours</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'plandeclasse:index' %}">Plan de classe</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'pages:initiatives' %}">Initiatives numériques européennes</a>
+            </li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'pages:about' %}">À&nbsp;propos</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'pages:privacy' %}">Vie privée &amp; confidentialité</a>
+            </li>
+        </ul>
 
-        <div id="nav" class="collapse navbar-collapse">
-            <ul class="navbar-nav ms-auto">
-                <li class="nav-item"><a class="nav-link" href="{% url 'pages:home' %}">Accueil</a></li>
-                <li class="nav-item"><a class="nav-link" href="{% url 'cours:index' %}">Cours</a></li>
-                <li class="nav-item"><a class="nav-link" href="{% url 'plandeclasse:index' %}">Plan de classe</a></li>
-                <li class="nav-item"><a class="nav-link" href="{% url 'pages:initiatives' %}">Initiatives numériques
-                    européennes</a></li>
-                <li class="nav-item"><a class="nav-link" href="{% url 'pages:about' %}">À&nbsp;propos</a></li>
-                <li class="nav-item"><a class="nav-link" href="{% url 'pages:privacy' %}">Vie privée &amp;
-                    confidentialité</a></li>
-            </ul>
-        </div>
     </div>
 </nav>
 
@@ -54,7 +47,7 @@
     </div>
 </footer>
 
-<!-- Bootstrap JS -->
+<!-- Bootstrap JS bundle -->
 <script src="{% static 'vendor/bootstrap/5.3.7/js/bootstrap.bundle.min.js' %}" defer></script>
 
 {% block extra_js %}{% endblock %}
