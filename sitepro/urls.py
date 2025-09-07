@@ -8,6 +8,8 @@ from django.http import HttpResponse
 from django.urls import include, path
 from django.views.generic import TemplateView
 
+from sitepro.views import importmap_json
+
 
 def healthz(_request) -> HttpResponse:
     """endpoint très simple pour les sondes de liveness."""
@@ -30,7 +32,9 @@ urlpatterns = [
         TemplateView.as_view(template_name="pages/robots.txt", content_type="text/plain"),
         name="robots_txt",
     ),
-    path("healthz", healthz)
+    path("healthz", healthz),
+    path("importmap.json", importmap_json, name="importmap"),
+
 ]
 
 # en dev seulement : servir les fichiers media via django
