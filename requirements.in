@@ -12,3 +12,4 @@ redis
 cairosvg
 django-redis
 ortools
+whitenoise

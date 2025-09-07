@@ -59,6 +59,7 @@ export function reconcileAfterSchemaChange() {
     renderStudents();
     renderConstraints();
     updateBanButtonLabel();
+    renderRowsEditor();
 }
 
 
@@ -102,4 +103,48 @@ export function resetRoomSchema() {
     reconcileAfterSchemaChange();
 
     // (reconcileAfterSchemaChange fait déjà les render + updateBanButtonLabel)
+}
+
+// schema.js
+export function renderRowsEditor() {
+    const root = document.getElementById("rowsEditor");
+    if (!root) return;
+    root.innerHTML = "";
+
+    const rows = state.schema;
+    if (!Array.isArray(rows) || rows.length === 0) {
+        root.innerHTML = `<div class="text-muted small">aucune rangée pour le moment.</div>`;
+        return;
+    }
+
+    rows.forEach((caps, y) => {
+        const item = document.createElement("div");
+        item.className = "d-flex align-items-center justify-content-between border rounded px-2 py-1";
+
+        const label = document.createElement("div");
+        const nice = caps.map(c => c > 0 ? c : `trou(${Math.abs(c)})`).join(" · ");
+        label.innerHTML = `<strong>rangée ${y + 1}</strong> <span class="text-muted">(${nice})</span>`;
+
+        const btn = document.createElement("button");
+        btn.className = "btn btn-sm btn-outline-danger";
+        btn.setAttribute("aria-label", `Supprimer la rangée ${y + 1}`);
+        btn.textContent = "🗑";
+        btn.addEventListener("click", () => {
+            if (!confirm(`Supprimer la rangée ${y + 1} ?`)) return;
+            deleteRowAt(y);
+        });
+
+        item.appendChild(label);
+        item.appendChild(btn);
+        root.appendChild(item);
+    });
+}
+
+export function deleteRowAt(y) {
+    if (y < 0 || y >= state.schema.length) return;
+    // Retire la rangée
+    state.schema.splice(y, 1);
+    // Recalage des placements/interdits/forbid_seat existants
+    reconcileAfterSchemaChange();
+    // Rafraîhit la petite liste des rangées
 }

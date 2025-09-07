@@ -17,7 +17,7 @@ import {
     renderConstraints
 } from "./constraints.js";
 import {onCanvasClick, resetPlanKeepRoom, toggleSelectedSeatBan, unassignSelected} from "./interactions.js";
-import {applySchema, reconcileAfterSchemaChange, resetRoomSchema} from "./schema.js";
+import {applySchema, reconcileAfterSchemaChange, renderRowsEditor, resetRoomSchema} from "./schema.js";
 import {setupExportUI, startExport} from "./export.js";
 import {setupSolveUI, syncSolveButtonEnabled, startSolve} from "./solver.js";
 import {setupUnifiedImport} from "./importers.js";
@@ -95,6 +95,7 @@ function init() {
         renderConstraints();
         updateBanButtonLabel();
         syncSolveButtonEnabled();
+        renderRowsEditor();
     });
 
     // Options solveur
@@ -145,6 +146,7 @@ function init() {
     refreshConstraintSelectors();
     onConstraintTypeChange();
     updateBanButtonLabel();
+    renderRowsEditor();
 
     // Bootstrap tooltips
     document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
@@ -170,6 +172,7 @@ function init() {
             resetRoomSchema();
             // Après une salle vide, le bouton "générer" ne doit pas permettre un solve
             syncSolveButtonEnabled();
+            renderRowsEditor();
         });
     }
 

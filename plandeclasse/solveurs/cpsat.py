@@ -1,7 +1,7 @@
-# plandeclasse/solveurs/cpsat.py
 from __future__ import annotations
 
 import logging
+import random
 from dataclasses import dataclass
 from typing import DefaultDict, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
@@ -47,19 +47,32 @@ class SolveurCPSAT(Solveur):
     Contraintes unaires « dures » encodées :
       • SEUL_A_TABLE (solo_table)
       • NO_ADJACENT (no_adjacent)
-      • EMPTY_NEIGHBOR (empty_neighbor)  ← nouveau, encodé correctement
+      • EMPTY_NEIGHBOR (empty_neighbor)
 
-    Remarque : les “règles ASP” des classes de contraintes ne sont pas utilisées ici ;
-    tout est encodé directement dans CP-SAT pour éviter les divergences de sémantique.
+    Variabilité :
+      • `seed` : graine aléatoire (reproductible)
+      • `randomize_order` : mélange l’ordre des élèves avant modélisation
+      • `tiebreak_random` : 4ᵉ passe aléatoire qui départage les co-optimums
     """
 
-    def __init__(self, *, prefer_alone: bool = True, prefer_mixage: bool = True) -> None:
+    def __init__(
+            self,
+            *,
+            prefer_alone: bool = True,
+            prefer_mixage: bool = True,
+            seed: Optional[int] = None,
+            randomize_order: bool = False,
+            tiebreak_random: bool = True,
+    ) -> None:
         super().__init__()
         self.prefer_alone: bool = prefer_alone
         self.prefer_mixage: bool = prefer_mixage
+        self.seed: Optional[int] = seed
+        self.randomize_order: bool = randomize_order
+        self.tiebreak_random: bool = tiebreak_random
         logger.info(
-            "SolveurCPSAT initialisé (prefer_alone=%s, prefer_mixage=%s)",
-            prefer_alone, prefer_mixage
+            "SolveurCPSAT initialisé (prefer_alone=%s, prefer_mixage=%s, seed=%s, randomize_order=%s, tiebreak_random=%s)",
+            prefer_alone, prefer_mixage, seed, randomize_order, tiebreak_random
         )
 
     # ------------------------------------------------------------------ API Solveur
@@ -76,25 +89,35 @@ class SolveurCPSAT(Solveur):
         """
         Résolution avec **optimisation lexicographique** :
         iso → mixage → distance, en figeant l’optimum de chaque passe pour la suivante.
+        Une 4ᵉ passe optionnelle et aléatoire départage les co-optimums.
         """
+        # RNG (reproductible si seed non-nulle)
+        rng = random.Random(self.seed)
+
         # 0) Vérifications rapides
         self._sanity_check(salle, eleves, contraintes)
 
+        # 0bis) Ordre des élèves (variabilité contrôlée)
+        eleves_work: List[Eleve] = list(eleves)
+        if self.randomize_order:
+            rng.shuffle(eleves_work)
+
         # 1) Sièges + domaines autorisés
         seats: List[_Seat] = self._enumerate_seats(salle)
-        allowed_by_e: Dict[int, Set[int]] = self._compute_allowed_domains(salle, eleves, contraintes, seats)
-        self._apply_exact_seats(contraintes, eleves, seats, allowed_by_e)
+        allowed_by_e: Dict[int, Set[int]] = self._compute_allowed_domains(salle, eleves_work, contraintes, seats)
+        self._apply_exact_seats(contraintes, eleves_work, seats, allowed_by_e)
 
         # 2) Arêtes d’adjacence intra-table (|Δs| = 1)
         edges_adj: List[Tuple[int, int]] = self._adjacent_edges_same_table(seats)
 
         # 3) Budget temps par passe
         time_total_s: Optional[float] = (budget_temps_ms / 1000.0) if budget_temps_ms and budget_temps_ms > 0 else None
-        per_pass_s: Optional[float] = (time_total_s / 3.0) if time_total_s else None
+        n_passes = 3 + (1 if self.tiebreak_random else 0)
+        per_pass_s: Optional[float] = (time_total_s / n_passes) if time_total_s else None
 
         # ==================== PASS 1 — objectif principal ====================
         model1, x1, sumY1, nb_iso1, nb_same1 = self._build_model(
-            eleves, seats, allowed_by_e, contraintes, edges_adj,
+            eleves_work, seats, allowed_by_e, contraintes, edges_adj,
             include_isolates=True, include_mixage=True
         )
 
@@ -122,7 +145,7 @@ class SolveurCPSAT(Solveur):
         do_pass2: bool = self.prefer_alone and self.prefer_mixage and (nb_same1 is not None)
         if do_pass2:
             model2, x2, sumY2, nb_iso2, nb_same2 = self._build_model(
-                eleves, seats, allowed_by_e, contraintes, edges_adj,
+                eleves_work, seats, allowed_by_e, contraintes, edges_adj,
                 include_isolates=True, include_mixage=True
             )
 
@@ -144,7 +167,7 @@ class SolveurCPSAT(Solveur):
 
         # ==================== PASS 3 — distance au tableau ====================
         model3, x3, sumY3, nb_iso3, nb_same3 = self._build_model(
-            eleves, seats, allowed_by_e, contraintes, edges_adj,
+            eleves_work, seats, allowed_by_e, contraintes, edges_adj,
             include_isolates=True, include_mixage=True
         )
         if self.prefer_alone:
@@ -158,9 +181,54 @@ class SolveurCPSAT(Solveur):
         if status3 not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
             return ResultatResolution(affectation=None, essais=0, verifications=0)
 
-        # 4) Reconstruction de l’affectation
+        best_sumY: int = int(solver3.Value(sumY3))
+
+        # ==================== PASS 4 — départage aléatoire (optionnel) ====================
+        if self.tiebreak_random:
+            model4, x4, sumY4, nb_iso4, nb_same4 = self._build_model(
+                eleves_work, seats, allowed_by_e, contraintes, edges_adj,
+                include_isolates=True, include_mixage=True
+            )
+            # figer l’optimum des passes précédentes
+            if self.prefer_alone:
+                model4.Add(nb_iso4 == best_iso)
+            if self.prefer_mixage and (nb_same4 is not None) and (best_same is not None):
+                model4.Add(nb_same4 == best_same)
+            model4.Add(sumY4 == best_sumY)
+
+            # Objectif aléatoire reproductible (en fonction de 'seed')
+            # Maximize(Σ w[e,i] * x[e,i]) pour choisir un optimum différent.
+            weights: Dict[Tuple[int, int], int] = {}
+            E = len(eleves_work)
+            S = len(seats)
+            for e in range(E):
+                for i in range(S):
+                    # Poids strictement positifs pour éviter les égalités triviales
+                    weights[(e, i)] = rng.randrange(1, 1_000_000)
+            rand_expr = sum(weights[(e, i)] * x4[e][i] for e in range(E) for i in range(S))
+            model4.Maximize(rand_expr)
+
+            solver4 = self._make_solver(per_pass_s)
+            status4 = solver4.Solve(model4)
+            if status4 in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+                affectation4: Dict[Eleve, Position] = {}
+                for e_idx, e in enumerate(eleves_work):
+                    seat_taken: Optional[int] = None
+                    for i in range(len(seats)):
+                        if solver4.Value(x4[e_idx][i]) == 1:
+                            seat_taken = i
+                            break
+                    if seat_taken is None:
+                        return ResultatResolution(affectation=None, essais=0, verifications=0)
+                    st = seats[seat_taken]
+                    affectation4[e] = Position(x=st.x, y=st.y, siege=st.s)
+                if self.valider_final(salle, affectation4, contraintes):
+                    return ResultatResolution(affectation=affectation4, essais=0, verifications=0)
+                # sinon on retombe sur la passe 3 (sécurité)
+
+        # 4) Reconstruction de l’affectation (passe 3)
         affectation: Dict[Eleve, Position] = {}
-        for e_idx, e in enumerate(eleves):
+        for e_idx, e in enumerate(eleves_work):
             seat_taken: Optional[int] = None
             for i in range(len(seats)):
                 if solver3.Value(x3[e_idx][i]) == 1:
@@ -168,7 +236,6 @@ class SolveurCPSAT(Solveur):
                     break
             if seat_taken is None:
                 return ResultatResolution(affectation=None, essais=0, verifications=0)
-
             st = seats[seat_taken]
             affectation[e] = Position(x=st.x, y=st.y, siege=st.s)
 
@@ -231,16 +298,11 @@ class SolveurCPSAT(Solveur):
             model.Add(sum(x[e][i] for e in range(E)) <= 1)
 
         # ---------- Pré-calculs adjacency / tables ----------
-        # Prépare voisinages adjacents (même table, |Δs|=1)
         neighbors_of: DefaultDict[int, List[int]] = defaultdict(list)
         for (i, j) in edges_adj:
             neighbors_of[i].append(j)
             neighbors_of[j].append(i)
 
-        # Index des sièges par table (clé (x,y) -> [indices sièges])
-        seats_by_table: DefaultDict[Tuple[int, int], List[int]] = defaultdict(list)
-        for i, st in enumerate(seats):
-            seats_by_table[st.table_key].append(i)
         seats_by_table: DefaultDict[Tuple[int, int], List[int]] = defaultdict(list)
         for i, st in enumerate(seats):
             seats_by_table[st.table_key].append(i)
@@ -296,7 +358,7 @@ class SolveurCPSAT(Solveur):
         for i in range(S):
             model.Add(occ[i] == sum(x[e][i] for e in range(E)))  # ∑∈{0,1}
 
-        # (1) SEUL_A_TABLE : si 'a' est sur une table T => aucun autre élève sur T
+        # (1) SEUL_A_TABLE
         solo_indices = [eleves.index(c.eleve) for c in contraintes if isinstance(c, DoitEtreSeulALaTable)]
         for a in solo_indices:
             for table_key, seat_ids in seats_by_table.items():
@@ -304,15 +366,14 @@ class SolveurCPSAT(Solveur):
                 a_sur_T = model.NewBoolVar(f"a{a}_on_{table_key[0]}_{table_key[1]}")
                 model.AddMaxEquality(a_sur_T, [x[a][i] for i in seat_ids])
 
-                # Somme des autres élèves sur la table T
-                #   -> variable entière pour pouvoir l'utiliser dans OnlyEnforceIf
+                # Somme des autres élèves sur T
                 sum_others_T = model.NewIntVar(0, len(seat_ids), f"sum_others_T_{table_key[0]}_{table_key[1]}_a{a}")
                 model.Add(sum_others_T == sum(x[e][i] for e in range(E) if e != a for i in seat_ids))
 
                 # Implication : si a_sur_T alors aucun autre élève sur T
                 model.Add(sum_others_T == 0).OnlyEnforceIf(a_sur_T)
 
-        # (2) NO_ADJACENT : pour 'a', si a est sur le siège i => aucun autre sur un siège adjacent à i
+        # (2) NO_ADJACENT
         no_adj_indices = [eleves.index(c.eleve) for c in contraintes if isinstance(c, DoitNePasAvoirVoisinAdjacent)]
         for a in no_adj_indices:
             for i, adj_i in neighbors_of.items():
@@ -320,40 +381,25 @@ class SolveurCPSAT(Solveur):
                     continue
                 sum_others_adj_i = model.NewIntVar(0, len(adj_i), f"sum_others_adj_i_{i}_a{a}")
                 model.Add(sum_others_adj_i == sum(x[e][j] for e in range(E) if e != a for j in adj_i))
-
-                # Implication : seulement si a est sur i
                 model.Add(sum_others_adj_i == 0).OnlyEnforceIf(x[a][i])
 
         # (3) EMPTY_NEIGHBOR — AU MOINS UN SIÈGE ADJACENT VIDE
         empty_neigh_indices = [eleves.index(c.eleve) for c in contraintes if isinstance(c, DoitAvoirVoisinVide)]
         for a in empty_neigh_indices:
             for i, adj_i in neighbors_of.items():
-                # Si le siège i n’a aucun voisin (table d’une place) → on considère la contrainte satisfaite
                 if not adj_i:
                     continue
                 # x[a,i] + Σ occ[j] ≤ |adj_i|
                 model.Add(x[a][i] + sum(occ[j] for j in adj_i) <= len(adj_i))
 
         need_empty_indices = [eleves.index(c.eleve) for c in contraintes if isinstance(c, DoitAvoirVoisinVide)]
-
-        # For each student "a" that needs at least one empty seat on their table:
-        # For every table T, if a is seated on T (a_on_T == 1), then the total
-        # occupancy of T must be <= capacity(T) - 1. We encode:
-        #   sum_occ_T + a_on_T <= capacity(T)
-        # because sum_occ_T already counts "a" when present.
         for a in need_empty_indices:
             for table_key, seat_ids in seats_by_table.items():
                 cap_T = len(seat_ids)
-
-                # a_on_T = OR_{i in seat_ids} x[a][i]
                 a_on_T = model.NewBoolVar(f"a{a}_needs_empty_on_{table_key[0]}_{table_key[1]}")
                 model.AddMaxEquality(a_on_T, [x[a][i] for i in seat_ids])
-
-                # sum_occ_T = total occupancy on table T (over all seats)
                 sum_occ_T = sum(occ[i] for i in seat_ids)
-
-                # If a_on_T == 1 => sum_occ_T <= cap_T - 1 ; else unconstrained.
-                # Encoded as: sum_occ_T + a_on_T <= cap_T
+                # sum_occ_T + a_on_T <= cap_T  ⇒ au moins un siège libre sur la table de a
                 model.Add(sum_occ_T + a_on_T <= cap_T)
 
         # ---------- Objectif (3) : somme des rangs Y ----------
@@ -366,7 +412,7 @@ class SolveurCPSAT(Solveur):
         for (i, j) in edges_adj:
             ii, jj = (i, j) if i < j else (j, i)
             v = model.NewBoolVar(f"pair_used_{ii}_{jj}")
-            model.Add(v <= occ[ii])
+            model.Add(v <= occ[ii]);
             model.Add(v <= occ[jj])
             model.Add(v >= occ[ii] + occ[jj] - 1)
             pair_used[(ii, jj)] = v
@@ -377,7 +423,6 @@ class SolveurCPSAT(Solveur):
                 model.Add(has_neighbor[i] == 0)
             else:
                 incident = [pair_used[(min(i, j), max(i, j))] for j in neighbors_of[i]]
-                # y = OR(incident) ⇔ y ≤ Σ v_k  et  y ≥ v_k (∀k)
                 model.Add(has_neighbor[i] <= sum(incident))
                 for v in incident:
                     model.Add(has_neighbor[i] >= v)
@@ -391,7 +436,7 @@ class SolveurCPSAT(Solveur):
         nb_isoles: cp_model.IntVar = model.NewIntVar(0, len(eleves), "nb_isoles")
         model.Add(nb_isoles == sum(iso))
 
-        # ---------- Objectif (2) : mixage (minimiser paires adjacentes même genre) ----------
+        # ---------- Objectif (2) : mixage ----------
         nb_same: Optional[cp_model.IntVar] = None
         if include_mixage:
             occ_f: List[cp_model.IntVar] = [model.NewBoolVar(f"occF_s{i}") for i in range(S)]
@@ -506,12 +551,17 @@ class SolveurCPSAT(Solveur):
             return "m"
         return None
 
-    @staticmethod
-    def _make_solver(time_limit_s: Optional[float]) -> cp_model.CpSolver:
+    def _make_solver(self, time_limit_s: Optional[float]) -> cp_model.CpSolver:
         solver = cp_model.CpSolver()
         if time_limit_s is not None:
             solver.parameters.max_time_in_seconds = max(0.1, time_limit_s)
         solver.parameters.num_search_workers = 8
+        # pour la variabilité reproductible
+        if self.seed is not None:
+            try:
+                solver.parameters.random_seed = int(self.seed)
+            except Exception:
+                pass
         return solver
 
     # ------------------------------------------------------------------ Vérifs préalables
@@ -555,14 +605,12 @@ class SolveurCPSAT(Solveur):
            on revérifie pour robustesse.
          - Binaires : revalidation directe.
         """
-        # Index rapides
         by_xy: Dict[Tuple[int, int], Dict[int, Eleve]] = defaultdict(dict)  # (x,y) -> {seat_index: eleve}
         pos_by_e: Dict[Eleve, Position] = {}
         for e, p in affectation.items():
             pos_by_e[e] = p
             by_xy[(p.x, p.y)][p.siege] = e
 
-        # Helpers
         def same_table(e1: Eleve, e2: Eleve) -> bool:
             p1 = pos_by_e.get(e1);
             p2 = pos_by_e.get(e2)
@@ -604,11 +652,9 @@ class SolveurCPSAT(Solveur):
                     continue
                 occ_xy = by_xy.get((p.x, p.y), {})
                 neighbors = [p.siege - 1, p.siege + 1]
-                # Si la table n’a *aucun* voisin (capacité 1), on considère la contrainte satisfaite.
                 valid_neighbors = [s for s in neighbors if s in range(0, max(occ_xy.keys(), default=-1) + 2)]
                 if not valid_neighbors:
                     continue
-                # Au moins un des voisins n’est pas occupé
                 if all(s in occ_xy for s in valid_neighbors):
                     return False
 

@@ -319,13 +319,6 @@ export function renderConstraints() {
     if (!root) return;
     root.innerHTML = "";
 
-    for (const m of buildObjectiveMarkers()) {
-        const item = document.createElement("div");
-        item.className = "constraint-pill me-2 mb-2 d-inline-flex align-items-center gap-2";
-        item.textContent = m.human;
-        root.appendChild(item);
-    }
-
     // Rendre les lots (marqueurs)
     const markers = state.constraints.filter(c => c.type === "_batch_marker_");
     for (const m of markers) {

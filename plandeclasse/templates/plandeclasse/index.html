@@ -71,9 +71,41 @@
             <!-- Configuration de la salle (séparée) -->
             <div class="col-12">
                 <div class="card shadow-sm">
-                    <div class="card-header py-2">
-                        <strong>configuration de la salle</strong>
+                    <div class="card-header py-2 d-flex align-items-center justify-content-between">
+                        <strong class="mb-0">configuration de la salle</strong>
+                        <a class="link-secondary small ms-3"
+                           data-bs-toggle="collapse"
+                           href="#pcHelpRows"
+                           role="button"
+                           aria-expanded="false"
+                           aria-controls="pcHelpRows">
+                            🛈 Comment saisir la disposition ?
+                        </a>
                     </div>
+
+                    <div class="card-body">
+                        <!-- Panneau d'aide sous le header -->
+                        <div id="pcHelpRows" class="collapse w-100 mb-3">
+                            <div class="pc-help small">
+                                <ul class="mb-2">
+                                    <li><strong>Format :</strong> entiers séparés par des virgules pour une
+                                        <em>rangée</em>.
+                                    </li>
+                                    <li><code>2,3,2</code> → ⟦□□⟧⟦□□□⟧⟦□□⟧ (tables de 2, puis 3, puis 2).</li>
+                                    <li><code>2,-3,2</code> → ⟦□□⟧ ⟦···⟧ ⟦□□⟧ (un <em>vide</em>/allée de 3 sièges).</li>
+                                </ul>
+                                <div class="text-muted">NB : “ajouter” duplique cette rangée selon « nombre de rangées
+                                    ».
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- le reste de ta mise en page (row g-2…) -->
+                        <div class="row g-2 align-items-end">
+                            <!-- … -->
+                        </div>
+                    </div>
+
                     <div class="card-body">
                         <div class="row g-2 align-items-end">
                             <!-- Col 1 : nombre de rangées (champ étroit) -->
@@ -103,6 +135,15 @@
                             <button id="btnResetRoomSchema" class="btn btn-outline-danger">
                                 Réinitialiser la salle
                             </button>
+                            <hr class="my-3">
+                            <div>
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <span class="fw-semibold">rangées actuelles</span>
+                                    <small class="text-muted">(cliquer sur 🗑 pour supprimer une rangée)</small>
+                                </div>
+                                <div id="rowsEditor" class="vstack gap-2"></div>
+                            </div>
+
                         </div>
                     </div>
                 </div>
@@ -279,11 +320,6 @@
             </div>
         </div>
 
-        <div class="form-check form-switch ms-auto">
-            <input class="form-check-input" type="checkbox" id="optLockPlacements" checked>
-            <label class="form-check-label" for="optLockPlacements">verrouiller mes placements</label>
-        </div>
-
         <!-- ===== Étape 4 ===== -->
         <div class="bg-light border rounded px-3 py-2 my-3 d-flex align-items-center">
             <span class="badge text-bg-primary me-2">Étape 4</span>
@@ -382,12 +418,12 @@
 
                         <div class="d-flex align-items-center gap-4 my-2 flex-wrap">
                             <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="optMixage" checked>
+                                <input class="form-check-input" type="checkbox" id="optMixage">
                                 <label class="form-check-label" for="optMixage">maximiser le mixage par genre</label>
                             </div>
                             <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="optSolo" checked>
-                                <label class="form-check-label" for="optSolo">maximiser les élèves seuls</label>
+                                <input class="form-check-input" type="checkbox" id="optSolo">
+                                <label class="form-check-label" for="optSolo">maximiser les élèves sans voisins</label>
                             </div>
                         </div>
 

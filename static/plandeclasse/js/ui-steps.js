@@ -3,7 +3,6 @@
     const csvInput = document.getElementById('csvInput');
     const csvNameEl = document.getElementById('csvFilename');
 
-    const btnBuild = document.getElementById('btnBuildRoom');
     const btnClear = document.getElementById('btnClearRoom');
 
     const step1Badge = document.getElementById('step1Status');
@@ -38,12 +37,24 @@
         });
     }
 
-    // Étape 2 : valider / réinitialiser
-    if (btnBuild) btnBuild.addEventListener('click', () => setBadge(step2Badge, true));
+    // Étape 2 : "OK" dès qu'il y a au moins une table rendue dans le canvas
+    function computeRoomReady() {
+        const canvas = document.getElementById('roomCanvas');
+        const hasTables = !!canvas && !!canvas.querySelector('.table-rect');
+        setBadge(step2Badge, hasTables ? true : false);
+    }
+        // Observe les changements du SVG (rendu/clear de la salle)
+    const canvas = document.getElementById('roomCanvas');
+
+    if (canvas) {
+        const obs = new MutationObserver(() => computeRoomReady());
+        obs.observe(canvas, {childList: true, subtree: true});
+        computeRoomReady();
+    }
+    // Si on clique "réinitialiser la salle", force le recompute
     if (btnClear) btnClear.addEventListener('click', () => {
-        setBadge(step2Badge, false);
-        // option : on remet l’étape 3 à facultatif si on réinitialise toute la salle
         setBadge(step3Badge, 'opt');
+        setTimeout(computeRoomReady, 0);
     });
 
     // Étape 3 : passe en OK si au moins un élève est "placé"

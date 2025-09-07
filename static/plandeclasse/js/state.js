@@ -68,8 +68,9 @@ export const state = {
     // Options transmises au solveur
     options: {
         solver: "cpsat",
-        prefer_mixage: true,
-        prefer_alone: true,
+        prefer_mixage: false,
+        prefer_alone: false,
+        lock_placements: false,
         time_budget_ms: 60_000, // lisible grâce au séparateur numérique
     },
 

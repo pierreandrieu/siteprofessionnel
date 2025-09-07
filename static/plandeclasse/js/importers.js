@@ -15,6 +15,7 @@ import {renderRoom, renderStudents, updateBanButtonLabel} from "./render.js";
 import {renderConstraints, refreshConstraintSelectors} from "./constraints.js";
 import {syncSolveButtonEnabled} from "./solver.js";
 import {syncExportButtonEnabled} from "./export.js";
+import {renderRowsEditor, reconcileAfterSchemaChange} from "./schema.js";
 
 /* =======================================================================
    Réinitialisation propre de l’état
@@ -31,6 +32,22 @@ function hardResetButKeepOptions() {
     state.constraints = [];
     // on garde state.options et state.nameView
 }
+
+// Conserve la salle + sièges interdits, mais remet à zéro le plan et les contraintes élèves
+function resetForNewStudentsKeepRoom() {
+    // placements & sélection
+    state.placements.clear();
+    state.placedByStudent.clear();
+    state.selection.studentId = null;
+    state.selection.seatKey = null;
+
+    // on supprime les contraintes non structurelles (élèves)
+    state.constraints = state.constraints.filter(c => c.type === "forbid_seat");
+
+    // recalcule proprement les forbid_seat depuis state.forbidden + schéma
+    reconcileAfterSchemaChange();
+}
+
 
 /** Post-apply : re-rendu UI + synchronisation des actions. */
 function refreshAllUI() {
@@ -50,6 +67,7 @@ function refreshAllUI() {
     renderRoom();
     updateBanButtonLabel();
     syncSolveButtonEnabled();
+    renderRowsEditor();
 }
 
 /* =======================================================================
@@ -62,7 +80,7 @@ function refreshAllUI() {
  */
 function importFromCSV(csvText) {
     const rows = parseCSV(csvText);
-    hardResetButKeepOptions();
+    resetForNewStudentsKeepRoom();
 
     const classInput = /** @type {HTMLInputElement|null} */ ($("#className"));
     if (classInput) classInput.value = "";  // on efface le nom
