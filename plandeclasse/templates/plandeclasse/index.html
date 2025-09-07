@@ -43,7 +43,7 @@
                                         class="d-none d-sm-inline">(icône ci-dessous)</span>.
                                     <div class="d-none d-sm-inline-block mt-1">
                                         <img src="{% static 'bouton_export_csv.png' %}" alt="bouton export CSV Pronote"
-                                             style="height:50px;opacity:.9">
+                                             class="h-50px opacity-90 img-fluid">
                                     </div>
                                     Puis sélectionner le fichier ici.
                                 </li>
@@ -112,8 +112,9 @@
                 <div class="row g-2 align-items-end">
                     <div class="col-12 col-md-3 col-lg-2">
                         <label class="form-label mb-1" for="rowsCount">Nombre de rangées</label>
-                        <input id="rowsCount" type="number" min="1" max="20" value="5" class="form-control w-auto"
-                               style="max-width:140px">
+
+                        <input id="rowsCount" type="number" min="1" max="20" value="5"
+                               class="form-control w-auto mw-140">
                     </div>
 
                     <div class="col-12 col-md-6 col-lg-7">
@@ -196,8 +197,8 @@
                         <div class="card-header py-2 d-flex justify-content-between align-items-center">
                             <strong>Liste des élèves</strong>
                             <div class="d-flex align-items-center gap-2">
-                                <input id="studentSearch" class="form-control form-control-sm" placeholder="rechercher…"
-                                       style="max-width:220px;">
+                                <input id="studentSearch" class="form-control form-control-sm mw-220"
+                                       placeholder="rechercher…">
                                 <button id="toggleStudentsPanel" class="btn btn-sm btn-outline-secondary"
                                         title="masquer/afficher la liste">↕
                                 </button>

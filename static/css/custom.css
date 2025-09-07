@@ -141,3 +141,27 @@ a:hover {
 }
 
 
+/* Helpers pour remplacer les styles inline */
+.size-36 {
+    width: 36px;
+    height: 36px;
+}
+
+.h-50px {
+    height: 50px;
+}
+
+/* ex: icône export */
+.opacity-90 {
+    opacity: .9;
+}
+
+/* 90% (Bootstrap propose 75/100 seulement) */
+.mw-140 {
+    max-width: 140px;
+}
+
+/* champs étroits */
+.mw-220 {
+    max-width: 220px;
+}
