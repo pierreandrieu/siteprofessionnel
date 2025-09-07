@@ -442,14 +442,9 @@
 {% endblock %}
 
 
+
 {% block extra_js %}
-    {% load static %}
-    <!-- Import map inline  -->
-    <script type="importmap" nonce="{{ csp_nonce }}">{{ importmap_json|safe }}</script>
-
-    <!-- Entrée ESM -->
+    <script type="importmap" nonce="{{ request.csp_nonce }}">{{ importmap_json|safe }}</script>
     <script type="module" src="{% static 'plandeclasse/js/plandeclasse.js' %}"></script>
-
-    <!-- Script classique -->
     <script src="{% static 'plandeclasse/js/ui-steps.js' %}" defer></script>
 {% endblock %}

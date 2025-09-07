@@ -24,11 +24,12 @@ INSTALLED_APPS = [
     "pages",
     "cours",
     "plandeclasse",
+    "csp"
 ]
+CSP_INCLUDE_NONCE_IN = ("script-src",)
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "sitepro.middleware.csp.CSPNonceMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -36,7 +37,14 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "csp.middleware.CSPMiddleware",
 ]
+
+CSP_DEFAULT_SRC = ("'self'",)
+CSP_SCRIPT_SRC  = ("'self'",)
+CSP_STYLE_SRC   = ("'self'",)
+CSP_IMG_SRC     = ("'self'", "data:")
+
 
 # Fichiers statiques : hash + compression (cache long côté client)
 STORAGES = {
@@ -72,9 +80,13 @@ TEMPLATES = [
 ]
 
 TEMPLATES[0]["OPTIONS"]["context_processors"] += [
-    "sitepro.context_processors.csp_nonce",
     "sitepro.context_processors.importmap_json",
 ]
+
+# TEMPLATES[0]["OPTIONS"]["context_processors"] += [
+#    "sitepro.context_processors.csp_nonce",
+#    "sitepro.context_processors.importmap_json",
+# ]
 
 WSGI_APPLICATION = "sitepro.wsgi.application"
 

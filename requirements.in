@@ -13,3 +13,4 @@ cairosvg
 django-redis
 ortools
 whitenoise
+django-csp
