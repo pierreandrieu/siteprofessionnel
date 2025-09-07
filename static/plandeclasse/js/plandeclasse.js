@@ -62,23 +62,19 @@ function init() {
     // >>> Import unifié (CSV ou JSON)
     setupUnifiedImport();
 
-    $("#btnAddRow")?.addEventListener("click", () => {
-        const capsStr = (/** @type {HTMLInputElement} */($("#rowCapacities"))).value;
+    $("#btnAddRow")?.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        const capsStr = /** @type {HTMLInputElement} */($("#rowCapacities")).value;
         const caps = capsStr.split(/[,\s]+/)
             .map(s => Number(s.trim()))
             .filter(n => Number.isFinite(n) && n !== 0);
         if (caps.length === 0) return;
 
-        // Nombre de rangées identiques à ajouter (défaut 1)
         const nInput = /** @type {HTMLInputElement|null} */ ($("#rowsCount"));
         const n = Math.max(1, Number(nInput?.value ?? 1) || 1);
 
-        // Empile n fois sans toucher aux rangées existantes
-        for (let k = 0; k < n; k++) {
-            state.schema.push(caps.slice());
-        }
+        for (let k = 0; k < n; k++) state.schema.push(caps.slice());
 
-        // Recalage (placements/interdits/contraintes) sans reconstruire le schéma
         reconcileAfterSchemaChange();
         syncSolveButtonEnabled();
     });
@@ -143,14 +139,12 @@ function init() {
     // Rendus initiaux
     renderRoom();
     renderStudents();
-    refreshConstraintSelectors();
-    if (document.getElementById("constraintType")) {
-        try {
-            onConstraintTypeChange();
-        } catch (e) {
-            console.error("init constraints UI:", e);
-        }
-    }    updateBanButtonLabel();
+    try {
+        refreshConstraintSelectors();
+        onConstraintTypeChange(); // ← ne casse plus si un id manque
+    } catch (e) {
+        console.error("init constraints failed", e);
+    }
     renderRowsEditor();
 
     // Bootstrap tooltips

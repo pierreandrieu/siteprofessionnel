@@ -158,75 +158,72 @@ export function refreshConstraintSelectors() {
 }
 
 
+function toggleParamBlock(show) {
+    const wrap = document.getElementById("cstParamInner") || document.getElementById("cstParamWrap");
+    if (!wrap) return;
+    if (show) {
+        wrap.classList.remove("d-none");
+        wrap.removeAttribute("hidden");
+    } else {
+        wrap.classList.add("d-none");
+        wrap.setAttribute("hidden", "true");
+    }
+}
+
+/** Version blindée (Chrome/Mobile OK) */
 export function onConstraintTypeChange() {
-    // Sélecteurs (null-safe)
     const typeSel = /** @type {HTMLSelectElement|null} */ (document.getElementById("constraintType"));
-    if (!typeSel) return; // l’UI contraintes n’est pas présente → on sort proprement
+    const pLabel = /** @type {HTMLElement|null} */        (document.getElementById("cstParamLabel"));
+    const pHelp = /** @type {HTMLElement|null} */        (document.getElementById("cstParamHelp"));
+    const pInput = /** @type {HTMLInputElement|null} */   (document.getElementById("cstParam"));
+
+    if (!typeSel || !pLabel || !pHelp || !pInput) return; // UI pas prête → on sort proprement
+
     const t = typeSel.value;
-
-    const pLabel = /** @type {HTMLElement|null} */ (document.getElementById("cstParamLabel"));
-    const pHelp = /** @type {HTMLElement|null} */ (document.getElementById("cstParamHelp"));
-    const pInput = /** @type {HTMLInputElement|null} */ (document.getElementById("cstParam"));
-
-    // Supporte l’ancien id (#cstParamWrap) et le nouveau (#cstParamInner)
-    const inner = document.getElementById("cstParamInner") || document.getElementById("cstParamWrap");
-
     const needsK = (t === "front_rows" || t === "back_rows");
     const needsD = (t === "far_apart");
 
-    // (Dé)masque le bloc paramètre sans casser la grille (et sans toucher à 'hidden' si absent)
-    if (inner) {
-        const show = (needsK || needsD);
-        inner.classList.toggle("d-none", !show);
-        if (inner.id === "cstParamWrap") {
-            if (show) inner.removeAttribute("hidden");
-            else inner.setAttribute("hidden", "true");
-        }
-    }
-
+    // k : nombre de rangées (entier >= 1)
     if (needsK) {
-        if (pLabel) pLabel.textContent = "k (nombre de rangées)";
-        if (pInput) {
-            pInput.min = "1";
-            pInput.step = "1";
-            pInput.removeAttribute("max");
-            pInput.value = "1";
-        }
-        if (pHelp) pHelp.textContent = "";
+        toggleParamBlock(true);
+        pLabel.textContent = "k (nombre de rangées)";
+        pInput.min = "1";
+        pInput.removeAttribute("max");
+        pInput.step = "1";
+        if (!pInput.value) pInput.value = "1";
+        pHelp.textContent = "";
         return;
     }
 
+    // d : distance Manhattan (entier >= 2, borné par computeMaxManhattan si pertinent)
     if (needsD) {
-        // borne supérieure indicative pour d (distance de Manhattan)
-        const maxD = computeMaxManhattan(state.schema); // peut être 0 si salle vide
-        if (pLabel) pLabel.textContent = "distance d (Manhattan)";
-        if (pInput) {
-            pInput.min = "2";
-            pInput.step = "1";
-            if (Number.isFinite(maxD) && maxD >= 3) {
-                pInput.max = String(maxD);
-                if (pHelp) pHelp.textContent = `valeur \u2264 ${maxD} pour cette salle`;
-            } else {
-                pInput.removeAttribute("max");
-                if (pHelp) pHelp.textContent = "";
-            }
-            const cur = Number(pInput.value);
-            pInput.value = (Number.isFinite(cur) && cur >= 2) ? String(cur) : "2";
-        } else if (pHelp) {
+        toggleParamBlock(true);
+        const maxD = computeMaxManhattan(state.schema) || 0;
+        pLabel.textContent = "distance d (Manhattan)";
+        pInput.min = "2";
+        pInput.step = "1";
+
+        if (Number.isFinite(maxD) && maxD >= 3) {
+            pInput.max = String(maxD);
+            pHelp.textContent = `valeur ≤ ${maxD} pour cette salle`;
+        } else {
+            pInput.removeAttribute("max");
             pHelp.textContent = "";
         }
+
+        const cur = Number(pInput.value);
+        pInput.value = (Number.isFinite(cur) && cur >= 2) ? String(cur) : "2";
         return;
     }
 
-    // Pas de paramètre pour les autres types
-    if (pLabel) pLabel.textContent = "Paramètre";
-    if (pInput) {
-        pInput.value = "";
-        pInput.removeAttribute("min");
-        pInput.removeAttribute("max");
-        pInput.removeAttribute("step");
-    }
-    if (pHelp) pHelp.textContent = "";
+    // Pas de paramètre
+    toggleParamBlock(false);
+    pLabel.textContent = "Paramètre";
+    pInput.value = "";
+    pInput.removeAttribute("min");
+    pInput.removeAttribute("max");
+    pInput.removeAttribute("step");
+    pHelp.textContent = "";
 }
 
 /**
