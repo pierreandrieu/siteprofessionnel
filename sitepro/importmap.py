@@ -19,7 +19,7 @@ def _list_js(subdir: str):
 
 def _build_scope(prefix: str):
     """
-    Mappe './state.js' -> '/static/prefix/state.<hash>.js', etc.
+    Mappe './state.js' -> URL hashée servie par Django (via Manifest).
     """
     files = _list_js(prefix)
     scope = {}
@@ -27,8 +27,10 @@ def _build_scope(prefix: str):
         m = _RE_HASH_JS.match(fname)
         if not m:
             continue
-        key = f"./{m.group('basename')}.js"
-        url = staticfiles_storage.url(f"{prefix}/{fname}")
+        basename = m.group('basename')         # ex: "importers"
+        key = f"./{basename}.js"               # spec ESM côté app
+        original = f"{prefix}/{basename}.js"   # **nom source non-hashé**
+        url = staticfiles_storage.url(original)  # Django renvoie /.../<hash>.js
         scope[key] = url
     return scope
 

@@ -73,6 +73,7 @@ TEMPLATES = [
 
 TEMPLATES[0]["OPTIONS"]["context_processors"] += [
     "sitepro.context_processors.csp_nonce",
+    "sitepro.context_processors.importmap_json",
 ]
 
 WSGI_APPLICATION = "sitepro.wsgi.application"

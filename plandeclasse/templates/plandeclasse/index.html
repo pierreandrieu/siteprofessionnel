@@ -440,12 +440,17 @@
     </div>
 
     {% block extra_js %}
-        {% load static %}
-        <script type="importmap" nonce="{{ csp_nonce }}">{{ importmap_json|safe }}</script>
-        <script async src="{% static 'vendor/es-module-shims/2.6.2/es-module-shims.min.js' %}"></script>
-        <script type="module" src="{% static 'plandeclasse/js/plandeclasse.js' %}"></script>
-        <script src="{% static 'plandeclasse/js/ui-steps.js' %}"></script>
-    {% endblock %}
+  {% load static %}
+  <!-- Import map inline  -->
+  <script type="importmap" nonce="{{ csp_nonce }}">{{ importmap_json|safe }}</script>
+
+  <!-- Entrée ESM -->
+  <script type="module" src="{% static 'plandeclasse/js/plandeclasse.js' %}"></script>
+
+  <!-- Script classique -->
+  <script src="{% static 'plandeclasse/js/ui-steps.js' %}" defer></script>
+{% endblock %}
+
 
 
 
