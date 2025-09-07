@@ -440,8 +440,16 @@
 
     {% block extra_js %}
         {% load static %}
+        {# 1) polyfill universel (optionnel mais fortement recommandé ici) #}
+        <script async src="{% static 'vendor/es-module-shims/2.6.2/es-module-shims.min.js' %}"></script>
+
+        {# 2) import map EXTERNE (pas inline — respecte "script-src 'self'") #}
         <script type="importmap" src="{% url 'importmap' %}"></script>
+
+        {# 3) module d’entrée #}
         <script type="module" src="{% static 'plandeclasse/js/plandeclasse.js' %}"></script>
+
+        {# script non-module (inchangé) #}
         <script src="{% static 'plandeclasse/js/ui-steps.js' %}"></script>
     {% endblock %}
 
