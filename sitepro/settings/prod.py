@@ -1,5 +1,6 @@
 from .base import *
 import os
+from sitepro.entetes_static import ajouter_entetes
 
 DEBUG = False
 
@@ -63,4 +64,5 @@ EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "true").lower() == "true"
 EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", "false").lower() == "true"
 EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "10"))  # seconds
 
-WHITENOISE_ADD_HEADERS_FUNCTION = "sitepro.entetes_static.ajouter_entetes"
+WHITENOISE_ADD_HEADERS_FUNCTION = ajouter_entetes
+

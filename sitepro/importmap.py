@@ -35,7 +35,6 @@ def _build_scope(prefix: str):
 
 @cache_page(60)
 def importmap_view(request):
-    # Tous les modules sont sous /static/plandeclasse/js/
     scope = _build_scope("plandeclasse/js")
     data = {
         "imports": {},
@@ -43,4 +42,4 @@ def importmap_view(request):
             "/static/plandeclasse/js/": scope
         },
     }
-    return JsonResponse(data)
+    return JsonResponse(data, content_type="application/importmap+json")
