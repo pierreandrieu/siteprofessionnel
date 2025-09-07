@@ -38,8 +38,18 @@ MIDDLEWARE = [
 ]
 
 # Fichiers statiques : hash + compression (cache long côté client)
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
-WHITENOISE_MAX_AGE = 31536000  # 1 an pour les fichiers hashés
+STORAGES = {
+    "default": {  # stockage des fichiers "media"
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {  # stockage des fichiers "static"
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
+
+WHITENOISE_MAX_AGE = 31536000  # 1 an pour les fichiers non versionnés
+# Optionnel en prod pour n'exposer QUE les fichiers fingerprintés :
+WHITENOISE_KEEP_ONLY_HASHED_FILES = True
 
 ROOT_URLCONF = "sitepro.urls"
 

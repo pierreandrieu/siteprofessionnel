@@ -63,17 +63,3 @@ EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "true").lower() == "true"
 EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", "false").lower() == "true"
 EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "10"))  # seconds
-
-
-# WhiteNoise DOIT être juste après SecurityMiddleware
-MIDDLEWARE = [
-                 "django.middleware.security.SecurityMiddleware",
-                 "whitenoise.middleware.WhiteNoiseMiddleware",
-             ] + [m for m in MIDDLEWARE if m not in (
-    "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",
-)]
-
-# Storage qui génère des URLs fingerprintées + gzip/br
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
-WHITENOISE_MAX_AGE = 31536000  # 1 an pour les fichiers hashés
