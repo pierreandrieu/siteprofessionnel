@@ -159,66 +159,74 @@ export function refreshConstraintSelectors() {
 
 
 export function onConstraintTypeChange() {
-    const t = /** @type {HTMLSelectElement} */ ($("#constraintType")).value;
-    const pLabel = $("#cstParamLabel");
-    const pHelp = $("#cstParamHelp");
-    const pInput = /** @type {HTMLInputElement} */ ($("#cstParam"));
+    // Sélecteurs (null-safe)
+    const typeSel = /** @type {HTMLSelectElement|null} */ (document.getElementById("constraintType"));
+    if (!typeSel) return; // l’UI contraintes n’est pas présente → on sort proprement
+    const t = typeSel.value;
 
-    // Supporte #cstParamInner (nouveau) ou #cstParamWrap (ancien)
+    const pLabel = /** @type {HTMLElement|null} */ (document.getElementById("cstParamLabel"));
+    const pHelp = /** @type {HTMLElement|null} */ (document.getElementById("cstParamHelp"));
+    const pInput = /** @type {HTMLInputElement|null} */ (document.getElementById("cstParam"));
+
+    // Supporte l’ancien id (#cstParamWrap) et le nouveau (#cstParamInner)
     const inner = document.getElementById("cstParamInner") || document.getElementById("cstParamWrap");
 
     const needsK = (t === "front_rows" || t === "back_rows");
     const needsD = (t === "far_apart");
 
-    // (dé)masque le bloc paramètre sans casser la grille
+    // (Dé)masque le bloc paramètre sans casser la grille (et sans toucher à 'hidden' si absent)
     if (inner) {
-        if (needsK || needsD) {
-            inner.classList?.remove("d-none");
-            inner.removeAttribute?.("hidden");
-        } else {
-            inner.classList?.add("d-none");
-            if (inner.id === "cstParamWrap") inner.setAttribute?.("hidden", "true");
+        const show = (needsK || needsD);
+        inner.classList.toggle("d-none", !show);
+        if (inner.id === "cstParamWrap") {
+            if (show) inner.removeAttribute("hidden");
+            else inner.setAttribute("hidden", "true");
         }
     }
 
     if (needsK) {
-        pLabel.textContent = "k (nombre de rangées)";
-        pInput.min = "1";
-        pInput.removeAttribute("max");
-        pInput.step = "1";
-        pInput.value = "1";
-        pHelp.textContent = "";
+        if (pLabel) pLabel.textContent = "k (nombre de rangées)";
+        if (pInput) {
+            pInput.min = "1";
+            pInput.step = "1";
+            pInput.removeAttribute("max");
+            pInput.value = "1";
+        }
+        if (pHelp) pHelp.textContent = "";
         return;
     }
 
     if (needsD) {
-        const maxD = computeMaxManhattan(state.schema); // peut être 0 si salle pas prête
-        pLabel.textContent = "distance d (Manhattan)";
-        pInput.min = "2";
-        pInput.step = "1";
-
-        // On n’impose *pas* de max si maxD ≤ 2 ou inconnu, pour laisser les flèches monter.
-        if (Number.isFinite(maxD) && maxD >= 3) {
-            pInput.max = String(maxD);
-            pHelp.textContent = `valeur ≤ ${maxD} pour cette salle`;
-        } else {
-            pInput.removeAttribute("max");
-            pHelp.textContent = ""; // ou un message indicatif si tu veux
+        // borne supérieure indicative pour d (distance de Manhattan)
+        const maxD = computeMaxManhattan(state.schema); // peut être 0 si salle vide
+        if (pLabel) pLabel.textContent = "distance d (Manhattan)";
+        if (pInput) {
+            pInput.min = "2";
+            pInput.step = "1";
+            if (Number.isFinite(maxD) && maxD >= 3) {
+                pInput.max = String(maxD);
+                if (pHelp) pHelp.textContent = `valeur \u2264 ${maxD} pour cette salle`;
+            } else {
+                pInput.removeAttribute("max");
+                if (pHelp) pHelp.textContent = "";
+            }
+            const cur = Number(pInput.value);
+            pInput.value = (Number.isFinite(cur) && cur >= 2) ? String(cur) : "2";
+        } else if (pHelp) {
+            pHelp.textContent = "";
         }
-
-        // Valeur par défaut = 2, mais si l’utilisateur avait déjà saisi >2, on garde.
-        const cur = Number(pInput.value);
-        pInput.value = (Number.isFinite(cur) && cur >= 2) ? String(cur) : "2";
         return;
     }
 
-    // Pas de paramètre
-    pLabel.textContent = "Paramètre";
-    pInput.value = "";
-    pInput.removeAttribute("min");
-    pInput.removeAttribute("max");
-    pInput.removeAttribute("step");
-    pHelp.textContent = "";
+    // Pas de paramètre pour les autres types
+    if (pLabel) pLabel.textContent = "Paramètre";
+    if (pInput) {
+        pInput.value = "";
+        pInput.removeAttribute("min");
+        pInput.removeAttribute("max");
+        pInput.removeAttribute("step");
+    }
+    if (pHelp) pHelp.textContent = "";
 }
 
 /**

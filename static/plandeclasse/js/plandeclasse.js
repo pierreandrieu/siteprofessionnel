@@ -144,8 +144,13 @@ function init() {
     renderRoom();
     renderStudents();
     refreshConstraintSelectors();
-    onConstraintTypeChange();
-    updateBanButtonLabel();
+    if (document.getElementById("constraintType")) {
+        try {
+            onConstraintTypeChange();
+        } catch (e) {
+            console.error("init constraints UI:", e);
+        }
+    }    updateBanButtonLabel();
     renderRowsEditor();
 
     // Bootstrap tooltips
