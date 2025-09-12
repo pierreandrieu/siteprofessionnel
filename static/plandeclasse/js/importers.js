@@ -79,6 +79,15 @@ function refreshAllUI() {
         both.checked = state.nameView === "both";
     }
 
+    //  Synchroniser les options importées vers l’UI
+    const optMix = /** @type {HTMLInputElement|null} */ ($("#optMixage"));
+    const optSolo = /** @type {HTMLInputElement|null} */ ($("#optSolo"));
+    const optLock = /** @type {HTMLInputElement|null} */ ($("#optLockPlacements"));
+
+    if (optMix) optMix.checked = !!state.options.prefer_mixage;
+    if (optSolo) optSolo.checked = !!state.options.prefer_alone;
+    if (optLock) optLock.checked = !!state.options.lock_placements;
+
     refreshConstraintSelectors();
     renderConstraints();
     renderStudents();
