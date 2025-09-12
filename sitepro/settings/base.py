@@ -3,6 +3,7 @@ import os
 from csp.constants import NONCE
 
 
+
 def _level(env_name: str, default: str = "INFO") -> str:
     val = os.getenv(env_name, default).upper()
     return val if val in {"CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"} else default
@@ -41,6 +42,8 @@ MIDDLEWARE = [
     "csp.middleware.CSPMiddleware",
 ]
 
+
+
 CONTENT_SECURITY_POLICY = {
     "DIRECTIVES": {
         "default-src": ["'self'"],
@@ -49,12 +52,13 @@ CONTENT_SECURITY_POLICY = {
         "img-src": ["'self'", "data:"],
         "frame-ancestors": ["'self'"],
         "font-src": ["'self'"],
-        "connect-src": ["'self'"],  # fetch/WebSocket/API
-        "object-src": ["'none'"],  # pas d’<object>/<embed>
+        "connect-src": ["'self'"],          # fetch/WebSocket/API
+        "object-src": ["'none'"],           # pas d’<object>/<embed>
         "base-uri": ["'self'"],
 
     }
 }
+
 
 # Fichiers statiques : hash + compression (cache long côté client)
 STORAGES = {
