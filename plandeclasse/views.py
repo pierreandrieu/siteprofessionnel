@@ -449,9 +449,11 @@ def export_plan(request: HttpRequest) -> HttpResponse:
 
     # 4) TXT (contraintes lisibles) — inchangé
     constraints_human = [
-        c.get("human") or json.dumps(c, ensure_ascii=False)
+        (c.get("human") or json.dumps(c, ensure_ascii=False))
         for c in data.get("constraints", [])
+        if str(c.get("type", "")).strip() and not str(c.get("type")).startswith("_")
     ]
+
     txt_bytes: bytes = ("\n".join(constraints_human) + ("\n" if constraints_human else "")).encode("utf-8")
 
     # 5) Noms de fichiers publics

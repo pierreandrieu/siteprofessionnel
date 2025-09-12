@@ -142,16 +142,11 @@ export function buildSolvePayload() {
     const lockedPlacements = Object.fromEntries(source);
 
     // 3) Verrouillage : par défaut true, et de toute façon true s’il y a au moins 1 placement
-    const lockFromState = Object.prototype.hasOwnProperty.call(etat.options, "lock_placements")
-        ? !!etat.options.lock_placements
-        : true;
 
-    const lock_placements = lockFromState || Object.keys(lockedPlacements).length > 0;
-
-    // (debug temporaire)
-    console.log("[solve] lock_placements=", lock_placements,
-        "nb placements=", Object.keys(lockedPlacements).length,
-        lockedPlacements);
+    // Si l’UI contient des exact_seat, on n’utilise PAS lock_placements (évite doublons backend)
+    const hasExact = etat.constraints.some((c) => c.type === "exact_seat");
+    const lockFromState = Object.prototype.hasOwnProperty.call(etat.options, "lock_placements")? !!etat.options.lock_placements : true;
+    const lock_placements = hasExact ? false : (lockFromState || Object.keys(lockedPlacements).length > 0);
 
     return {
         schema: etat.schema,

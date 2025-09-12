@@ -56,8 +56,8 @@ function resetForNewStudentsKeepRoom() {
     state.selection.studentId = null;
     state.selection.seatKey = null;
 
-    // garde uniquement les contraintes structurelles de siège
-    state.constraints = state.constraints.filter((c) => c.type === "forbid_seat");
+    // garde uniquement les contraintes structurelles de siège ET les exact_seat
+    state.constraints = state.constraints.filter((c) => c.type === "forbid_seat" || c.type === "exact_seat");
 
     // recalcule les forbid_seat depuis `state.forbidden` + schéma
     reconcileAfterSchemaChange();
@@ -183,9 +183,9 @@ function importFromExportJSON(data) {
         return {id, name, first, last, gender};
     });
 
-    // Contraintes (copie par valeur)
-    state.constraints = Array.isArray(data.constraints) ? data.constraints.slice() : [];
-
+    // Contraintes (copie par valeur) — on ignore les marqueurs UI-only (_objective_)
+    const rawConstraints = Array.isArray(data.constraints) ? data.constraints.slice() : [];
+    state.constraints = rawConstraints.filter((c) => c?.type !== "_objective_");
     // Sièges interdits
     state.forbidden = new Set(Array.isArray(data.forbidden) ? data.forbidden : []);
 

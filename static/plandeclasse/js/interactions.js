@@ -38,6 +38,74 @@ function refreshConstraintsUI() {
     renderConstraints();
 }
 
+/** Trouve une contrainte exact_seat par élève. */
+function findExactSeatConstraint(sid) {
+        return state.constraints.find((c) => c.type === "exact_seat" && Number(c.a) === Number(sid)) || null;
+}
+
+/** Ajoute ou met à jour la contrainte exact_seat pour sid -> seatKey. */
+function upsertExactSeatConstraint(sid, seatKey) {
+    const [x, y, s] = seatKey.split(",").map(Number);
+    const cur = findExactSeatConstraint(sid);
+    const human = ` ${x}, ${y}, ${s}`;
+    if (cur) {
+        cur.x = x;
+        cur.y = y;
+        cur.s = s;
+        cur.human = `${cur.human || ""}`.trim();
+    } else {
+        state.constraints.push({type: "exact_seat", a: Number(sid), x, y, s});
+    }
+    refreshConstraintsUI();
+}
+
+/** Supprime la contrainte exact_seat pour cet élève (s’il y en a une). */
+function removeExactSeatConstraint(sid) {
+    const idx = state.constraints.findIndex((c) => c.type === "exact_seat" && Number(c.a) === Number(sid));
+    if (idx >= 0)
+        state.constraints.splice(idx, 1);
+    refreshConstraintsUI();
+}
+
+/* ==========================================================================
++   Ré-application des placements "pinnés" (exact_seat) depuis les contraintes
++   ========================================================================== */
+function reapplyExactSeatsFromConstraints() {
+    // pour des checks rapides
+    const validIds = new Set(state.students.map((s) => s.id));
+        /** Util : construit une seatKey fiable depuis une contrainte. */
+    const keyFromC = (c) => {
+        if (typeof c.key === "string" && c.key.includes(",")) return c.key;
+        const x = Number(c.x ?? c.X);
+        const y = Number(c.y ?? c.Y);
+        const s = Number(c.s ?? c.seat);
+        if ([x, y, s].every(Number.isFinite)) return `${x},${y},${s}`;
+        return null;
+    };
+    for (const c of state.constraints) {
+        if (c.type !== "exact_seat") continue;
+            // tolérant : a | studentId | eleve (numérique côté UI)
+        const sid = Number(c.a ?? c.studentId ?? c.eleve);
+        if (!Number.isFinite(sid) || !validIds.has(sid)) continue;
+        const k = keyFromC(c);
+        if (!k) continue;
+            // existence du siège dans le schéma
+        const [x, y, s] = k.split(",").map(Number);
+        if (!(y >= 0 && y < state.schema.length)) continue;
+        if (!(x >= 0 && x < state.schema[y].length)) continue;
+        const cap = state.schema[y][x];
+        if (!(cap > 0 && s >= 0 && s < cap)) continue;
+            // on évite de poser sur un siège explicitement interdit
+        if (state.forbidden.has(k)) continue;
+        // place (en supposant reset → personne n'est encore posé)
+        if (!state.placements.has(k)) {
+            state.placements.set(k, sid);
+            state.placedByStudent.set(sid, k);
+        }
+    }
+}
+
+
 /* ==========================================================================
    Réinitialisation du plan (sans toucher à la salle)
    ========================================================================== */
@@ -61,11 +129,37 @@ export function resetPlanKeepRoom() {
     state.selection.studentId = null;
     state.selection.seatKey = null;
 
+    reapplyExactSeatsFromConstraints();
     // Re-rendu + synchro des boutons de contexte
     refreshPlanUI();
     // Affiche toujours la liste des contraintes (inchangée)
     refreshConstraintsUI();
 }
+
+/** Construit "x,y,s" à partir d'une contrainte exact_seat (tolérante). */
+function keyFromExactSeatConstraint(c) {
+    if (typeof c?.key === "string" && c.key.includes(",")) return c.key;
+    const x = Number(c?.x ?? c?.X);
+    const y = Number(c?.y ?? c?.Y);
+    const s = Number(c?.s ?? c?.seat);
+    return [x, y, s].every(Number.isFinite) ? `${x},${y},${s}` : null;
+}
+
+/** Supprime la contrainte exact_seat qui fixe `sid` sur `seatKey` (s’il y en a une). */
+function removeExactSeatConstraintFor(sid, seatKey) {
+    let changed = false;
+    state.constraints = state.constraints.filter((c) => {
+        if (c?.type !== "exact_seat") return true;
+        const cSid = Number(c.a ?? c.studentId ?? c.eleve);
+        if (!Number.isFinite(cSid) || cSid !== Number(sid)) return true;
+        const k = keyFromExactSeatConstraint(c);
+        if (k !== seatKey) return true;
+        changed = true;            // on retire cette contrainte
+        return false;
+    });
+    if (changed) renderConstraints();
+}
+
 
 /* ==========================================================================
    Clic sur un siège (sélection / affectation / permutation)
@@ -106,6 +200,8 @@ export function seatClick(seatKey) {
             if (prevSeat) state.placements.delete(prevSeat);
             state.placements.set(seatKey, selSid);
             state.placedByStudent.set(selSid, seatKey);
+            // Action manuelle : contrainte/maj exact_seat pour l'élève sélectionné
+            upsertExactSeatConstraint(selSid, seatKey);
             // nettoyage de la sélection
             state.selection.studentId = null;
             state.selection.seatKey = null;
@@ -131,6 +227,8 @@ export function seatClick(seatKey) {
             // Place l'élève sélectionné sur le siège cliqué
             state.placements.set(seatKey, selSid);
             state.placedByStudent.set(selSid, seatKey);
+            // Contrainte exacte mise à jour uniquement pour l’élève que l’utilisateur manipule
+            upsertExactSeatConstraint(selSid, seatKey);
             state.selection.studentId = null;
             state.selection.seatKey = null;
         }
@@ -233,9 +331,13 @@ export function unassignSelected() {
     const sid = state.placements.get(k);
     if (sid == null) return; // rien à retirer
 
+    removeExactSeatConstraintFor(sid, k);
     // Supprime l’affectation (les deux index)
     state.placements.delete(k);
     state.placedByStudent.delete(sid);
+
+    // Côté spec : "si on vide l'élève de son siège ⇒ contrainte retirée"
+    removeExactSeatConstraint(sid);
 
     // Désélectionne tout (élève + siège)
     state.selection.studentId = null;
@@ -243,4 +345,5 @@ export function unassignSelected() {
 
     // Re-rendu + synchro des boutons
     refreshPlanUI();
+    renderConstraints();
 }

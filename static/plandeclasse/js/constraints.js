@@ -92,6 +92,8 @@ function displayNameById(id /**: number */) /**: string */ {
 /** Humanise une contrainte individuelle non batchée (fallback legacy). */
 function humanizeConstraint(c /**: any */) /**: string */ {
     switch (c.type) {
+        case "exact_seat":
+            return `${displayNameById(c.a)} doit être exactement en (x=${c.x}, y=${c.y}, s=${c.s})`;
         case "forbid_seat":
             return c.human || `siège (x=${c.x}, y=${c.y}, s=${c.s}) doit rester vide`;
         case "front_rows":
@@ -372,9 +374,10 @@ export function renderConstraints() {
         root.appendChild(item);
     }
 
-    // --- 2) Contraintes individuelles sans batch_id (legacy / forbid_seat / directes) ---
+    // --- 2) Contraintes individuelles sans batch_id (legacy / forbid_seat / directes)
+    //         et on ignore les marqueurs UI-only (ex: _objective_)
     const singles = state.constraints.filter(
-        (c) => c.type !== "_batch_marker_" && !c.batch_id
+        (c) => c.type !== "_batch_marker_" && c.type !== "_objective_" && !c.batch_id
     );
 
     for (const c of singles) {
@@ -398,6 +401,16 @@ export function renderConstraints() {
                 const k = c.key || (Number.isFinite(c.x) && Number.isFinite(c.y) && Number.isFinite(c.s) ? `${c.x},${c.y},${c.s}` : null);
                 if (k) state.forbidden.delete(k);
             }
+            // exact_seat : retirer aussi l'élève de sa place (spec : "virer la contrainte, ce qui vire l’élève")
+            if (c.type === "exact_seat") {
+                const sid = Number(c.a);
+                const prev = state.placedByStudent.get(sid);
+                if (prev) {
+                    state.placedByStudent.delete(sid);
+                    state.placements.delete(prev);
+                }
+            }
+
             // Retire la contrainte de l’array
             const idx = state.constraints.indexOf(c);
             if (idx >= 0) state.constraints.splice(idx, 1);

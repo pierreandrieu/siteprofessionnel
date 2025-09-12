@@ -252,31 +252,36 @@ def t_solve_plandeclasse(self, payload: Dict[str, Any]) -> Dict[str, Any]:
     salle = _build_salle(schema)
     eleves = _eleves_from_payload(students)
     order_ui_ids = _order_ui_ids(students)
-    if placements and not options_raw.get("lock_placements", False):
-        options_raw["lock_placements"] = True
 
-    # ----------- Contrainte(s) depuis l’UI -----------
+    # 1) Construire les contraintes depuis l’UI (inclut exact_seat si présents)
     contraintes: List[Contrainte] = _build_constraints(
         salle=salle,
         eleves=eleves,
         students_payload=students,
         constraints_ui=constraints_ui,
         forbidden=forbidden,
-        placements={},
-        lock_placements=False,
+        placements={},  # <- on laisse vide ici
+        lock_placements=False,  # <- et False ici
     )
-    # ----------- Verrouillage des placements existants (exact_seat) -----------
-    # mapping id UI -> objet Eleve (même ordre que _order_ui_ids)
+
+    # 2) Injection des placements “à verrouiller”, sans doublonner les exacts déjà présents
+    # map id UI -> Eleve
     id2eleve = {sid: eleves[i] for i, sid in enumerate(order_ui_ids)}
+
+    if options["lock_placements"] and placements:
+        # élève déjà pin par contrainte exact_seat
+        pinned_eleves = {c.eleve for c in contraintes if isinstance(c, DoitEtreExactementIci)}
+        pinned_ids = {sid for sid, e in id2eleve.items() if e in pinned_eleves}
+        placements_filtrés = {k: v for k, v in placements.items() if int(v) not in pinned_ids}
+    else:
+        placements_filtrés = {}
 
     inject_locked_placements_as_exact_constraints(
         respect_existing=options["lock_placements"],
-        placements=placements,
+        placements=placements_filtrés,
         id2eleve=id2eleve,
         contraintes=contraintes,
     )
-    nb_exact = sum(1 for c in contraintes if isinstance(c, DoitEtreExactementIci))
-    print(f"[solve] Placements verrouillés injectés : {nb_exact}")
     # ----------- Choix du solveur -----------
     slv, err = _make_solver(options)
     if err:

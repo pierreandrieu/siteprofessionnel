@@ -136,19 +136,6 @@ function collectRoomSvgMarkupStudent() {
     return serializeSvg(clone);
 }
 
-/** Marqueurs d’objectifs (lisibles dans le TXT). */
-function buildObjectiveMarkers() {
-    const out = [];
-    if (state.options.prefer_alone) {
-        out.push({type: "_objective_", human: "objectif : maximiser les élèves sans voisin"});
-    }
-    if (state.options.prefer_mixage) {
-        out.push({type: "_objective_", human: "objectif : minimiser les paires adjacentes de même genre"});
-    }
-    out.push({type: "_objective_", human: "objectif : minimiser la distance au tableau (somme des rangs)"});
-    return out;
-}
-
 /**
  * SVG “vue prof” : miroir vertical global + redressement local des <text>.
  * (texte lisible, positions miroir).
@@ -224,7 +211,7 @@ export function buildExportPayload() {
             id: s.id, name: s.name, first: s.first, last: s.last, gender: s.gender ?? null,
         })),
         options: state.options,
-        constraints: [...state.constraints, ...buildObjectiveMarkers()],
+        constraints: state.constraints,
         forbidden: Array.from(state.forbidden),
         placements: Object.fromEntries(state.placements),
         name_view: state.nameView,

@@ -17,7 +17,7 @@
 
 /**
  * Types de contraintes "élève".
- * @typedef {"front_rows"|"back_rows"|"solo_table"|"empty_neighbor"|"no_adjacent"|"same_table"|"far_apart"|"forbid_seat"} ConstraintType
+ * @typedef {"front_rows"|"back_rows"|"solo_table"|"empty_neighbor"|"no_adjacent"|"same_table"|"far_apart"|"forbid_seat"|"exact_seat"} ConstraintType
  */
 
 /**
@@ -47,6 +47,7 @@
  * @property {number} [x]      - abscisse table (forbid_seat)
  * @property {number} [y]      - ordonnée rangée (forbid_seat)
  * @property {number} [s]      - index siège dans la table (forbid_seat)
+ * // exact_seat : {type:"exact_seat", a:studentId, x,y,s}
  * @property {number} [k]      - nombre de rangées (front/back_rows)
  * @property {number} [d]      - distance Manhattan min (far_apart)
  * @property {string} [human]  - libellé lisible (UI / export TXT)

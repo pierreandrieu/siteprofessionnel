@@ -234,6 +234,35 @@ function initialiser() {
         });
     }
 
+    // --- Bouton : vider toutes les contraintes (et synchroniser forbidden/placements liés)
+    const btnClearCst = document.getElementById("btnClearConstraints");
+    if (btnClearCst && !btnClearCst.dataset.wired) {
+        btnClearCst.dataset.wired = "1";
+        btnClearCst.addEventListener("click", (ev) => {
+            ev.preventDefault();
+            if (!confirm("Supprimer toutes les contraintes ?")) return;
+            // Retire forbids du Set + désaffecte les élèves qui avaient un exact_seat
+            for (const c of etat.constraints) {
+                if (c.type === "forbid_seat") {
+                    const k = `${c.x},${c.y},${c.s}`;
+                    etat.forbidden.delete(k);
+                }
+                if (c.type === "exact_seat") {
+                    const prev = etat.placedByStudent.get(c.a);
+                    if (prev) {
+                        etat.placedByStudent.delete(c.a);
+                        etat.placements.delete(prev);
+                    }
+                }
+            }
+            etat.constraints = [];
+            +rendreSalle();
+            rendreEleves();
+            rendreContraintes();
+            majBoutonBan();
+        });
+    }
+
     // --- Synchronisation initiale des options mixage/solo (selon checkboxes)
     const optMix = /** @type {HTMLInputElement|null} */ (document.getElementById("optMixage"));
     const optSolo = /** @type {HTMLInputElement|null} */ (document.getElementById("optSolo"));
