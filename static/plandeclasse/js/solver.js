@@ -117,27 +117,59 @@ export function setupSolveUI() {
    Payload solveur
    ========================================================================== */
 
+
 /**
- * Construit le payload à envoyer au solveur.
- * NB : on remet `placements` à {} pour laisser le solveur repartir “propre”.
+ * Construit le payload envoyé au backend pour résoudre.
+ * - Si etat.options.lock_placements est vrai, on envoie les placements actuels
+ *   pour qu’ils soient verrouillés côté solveur (exact_seat).
  */
 export function buildSolvePayload() {
+    // 1) Récupère la source la plus fournie des placements
+    //    (selon tes versions : placements, fixedPlacements, pinned, lockedSeats, placedByStudent)
+    const candidates = [
+        etat.placements,
+        etat.fixedPlacements,
+        etat.pinned,
+        etat.lockedSeats,
+        etat.placedByStudent
+            ? new Map(Array.from(etat.placedByStudent, ([sid, seat]) => [seat, Number(sid)]))
+            : null,
+    ].filter(Boolean);
+
+    let source = candidates.find(m => m && m.size) || new Map();
+
+    // 2) Objet plat "x,y,s": id
+    const lockedPlacements = Object.fromEntries(source);
+
+    // 3) Verrouillage : par défaut true, et de toute façon true s’il y a au moins 1 placement
+    const lockFromState = Object.prototype.hasOwnProperty.call(etat.options, "lock_placements")
+        ? !!etat.options.lock_placements
+        : true;
+
+    const lock_placements = lockFromState || Object.keys(lockedPlacements).length > 0;
+
+    // (debug temporaire)
+    console.log("[solve] lock_placements=", lock_placements,
+        "nb placements=", Object.keys(lockedPlacements).length,
+        lockedPlacements);
+
     return {
         schema: etat.schema,
-        students: etat.students.map((s) => ({
-            id: s.id,
+        students: etat.students.map(s => ({
+            id: Number(s.id),
             name: s.name,
             first: s.first,
             last: s.last,
-            gender: s.gender || null,
+            gender: s.gender ?? null,
         })),
-        options: {...etat.options, respect_existing: false}, // libère les sièges
+        options: {...etat.options, lock_placements},   // <-- clé attendue côté backend
         constraints: etat.constraints,
         forbidden: Array.from(etat.forbidden),
-        placements: {}, // ne mettre ici que d’éventuels sièges explicitement verrouillés si vous ajoutez la notion
+        placements: lockedPlacements,
         name_view: etat.nameView,
     };
 }
+
 
 /* ==========================================================================
    Démarrage + polling

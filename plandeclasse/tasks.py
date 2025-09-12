@@ -9,7 +9,11 @@ from .modele.salle import Salle
 from .modele.eleve import Eleve
 from .contraintes.base import Contrainte
 from .fabrique_ui import fabrique_contraintes_ui
+from .utils_locks import inject_locked_placements_as_exact_constraints
 from .utils_svg import svg_from_layout
+from .contraintes.unaires import DoitEtreExactementIci
+from .contraintes.structurelles import TableDoitEtreVide, SiegeDoitEtreVide
+from .modele.position import Position
 
 # Solveurs disponibles : ASP (Clingo) et CP-SAT (OR-Tools)
 from .solveurs.asp import SolveurClingo
@@ -65,6 +69,11 @@ def _parse_options(options: Dict[str, Any]) -> Dict[str, Any]:
       - vary_each_run: bool  (si true et random_seed absent ⇒ seed aléatoire)
     """
     o = {**options}
+    if "lock_placements" not in o and "respect_existing" in o:
+        try:
+            o["lock_placements"] = bool(o["respect_existing"])
+        except Exception:
+            pass
     o["solver"] = str(o.get("solver", "asp")).lower().strip()
     o["prefer_alone"] = bool(o.get("prefer_alone", True))
     o["prefer_mixage"] = bool(o.get("prefer_mixage", True))
@@ -243,6 +252,8 @@ def t_solve_plandeclasse(self, payload: Dict[str, Any]) -> Dict[str, Any]:
     salle = _build_salle(schema)
     eleves = _eleves_from_payload(students)
     order_ui_ids = _order_ui_ids(students)
+    if placements and not options_raw.get("lock_placements", False):
+        options_raw["lock_placements"] = True
 
     # ----------- Contrainte(s) depuis l’UI -----------
     contraintes: List[Contrainte] = _build_constraints(
@@ -251,10 +262,21 @@ def t_solve_plandeclasse(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         students_payload=students,
         constraints_ui=constraints_ui,
         forbidden=forbidden,
-        placements=placements,
-        lock_placements=options["lock_placements"],
+        placements={},
+        lock_placements=False,
     )
+    # ----------- Verrouillage des placements existants (exact_seat) -----------
+    # mapping id UI -> objet Eleve (même ordre que _order_ui_ids)
+    id2eleve = {sid: eleves[i] for i, sid in enumerate(order_ui_ids)}
 
+    inject_locked_placements_as_exact_constraints(
+        respect_existing=options["lock_placements"],
+        placements=placements,
+        id2eleve=id2eleve,
+        contraintes=contraintes,
+    )
+    nb_exact = sum(1 for c in contraintes if isinstance(c, DoitEtreExactementIci))
+    print(f"[solve] Placements verrouillés injectés : {nb_exact}")
     # ----------- Choix du solveur -----------
     slv, err = _make_solver(options)
     if err:
