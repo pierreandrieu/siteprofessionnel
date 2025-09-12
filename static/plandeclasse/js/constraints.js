@@ -1,125 +1,132 @@
+// static/plandeclasse/js/constraints.js
 "use strict";
 
 /**
- * Module Constraints (version groupe) :
- * - Sélection multiple d’élèves (#cstStudents) pour créer des contraintes en lot.
- * - Contraintes unaires : appliquées à chaque élève sélectionné.
- * - Contraintes binaires : appliquées à chaque paire du groupe (combinaisons).
- * - Affichage groupé : une « pill » par lot avec libellé au pluriel.
- *   → suppression en un clic : retire toutes les contraintes du lot.
+ * Module Constraints (version groupe, CSP-safe)
  *
- * Remarque : chaque contrainte réelle porte un 'batch_id' facultatif,
- * utilisé uniquement côté UI pour grouper/retirer. Côté solveur/export,
- * on envoie la liste “flattened” telle quelle (inchangé pour le backend).
+ * Fonctions exposées :
+ * - refreshConstraintSelectors() : remplit la liste d’élèves (desktop + mobile)
+ * - onConstraintTypeChange()     : gère l’affichage/borne du champ paramètre (k/d)
+ * - addConstraint()              : ajoute des contraintes pour un groupe sélectionné
+ * - cancelConstraintForm()       : remet à zéro le formulaire (sélections/paramètres)
+ * - renderConstraints()          : affiche les lots + contraintes individuelles avec suppression
+ *
+ * Notes :
+ * - Les contraintes créées “en lot” reçoivent toutes un batch_id commun et un
+ *   marqueur spécial { type: "_batch_marker_", batch_id, human, count } pour l’IHM.
+ * - Les contraintes “forbid_seat” (issues des sièges interdits) restent individuelles,
+ *   et leur suppression met aussi à jour state.forbidden.
  */
+
 import {state} from "./state.js";
-import {$, compareByLastThenFirst, computeMaxManhattan, keyOf} from "./utils.js";
+import {$, compareByLastThenFirst, computeMaxManhattan} from "./utils.js";
 import {renderRoom, renderStudents, updateBanButtonLabel} from "./render.js";
 
+/* ==========================================================================
+   Helpers internes
+   ========================================================================== */
 
+/** Retourne la liste d’élèves triée NOM puis prénom. */
 function getStudentsSorted() {
     return [...state.students].sort(compareByLastThenFirst);
 }
 
-function buildObjectiveMarkers() {
-    const out = [];
-    if (state.options.prefer_alone) {
-        out.push({type: "_objective_", human: "objectif : maximiser les élèves sans voisin"});
-    }
-    if (state.options.prefer_mixage) {
-        out.push({type: "_objective_", human: "objectif : minimiser les paires adjacentes de même genre"});
-    }
-    out.push({type: "_objective_", human: "objectif : minimiser la distance au tableau (somme des rangs)"});
-    return out;
-}
-
-/**
- * Retourne la sélection d'élèves en tenant compte du fallback mobile.
- * - Desktop (≥ sm) : lit le <select multiple>
- * - Mobile (< sm) : lit les <input type="checkbox"> générés dans #cstStudentsMobile
- */
+/** Retourne les IDs sélectionnés (desktop : <select multiple>, mobile : checkboxes). */
 function getSelectedStudentIds() {
     const isMobile = window.matchMedia("(max-width: 575.98px)").matches;
     if (isMobile) {
         const inputs = document.querySelectorAll("#cstStudentsMobile input[type=checkbox]:checked");
-        return Array.from(inputs).map(i => Number(i.value));
+        return Array.from(inputs).map((i) => Number(i.value));
     }
     const sel = /** @type {HTMLSelectElement|null} */ (document.getElementById("cstStudents"));
     if (!sel) return [];
-    return Array.from(sel.selectedOptions).map(o => Number(o.value));
+    return Array.from(sel.selectedOptions).map((o) => Number(o.value));
 }
 
-/** Réinitialise le formulaire de création de contraintes (desktop + mobile). */
-export function cancelConstraintForm() {
-    // Desktop: <select multiple>
-    const sel = /** @type {HTMLSelectElement|null} */ (document.getElementById("cstStudents"));
-    if (sel) sel.selectedIndex = -1;
-
-    // Mobile: checkboxes
-    const mob = /** @type {HTMLElement|null} */ (document.getElementById("cstStudentsMobile"));
-    if (mob) {
-        mob.querySelectorAll('input[type="checkbox"]').forEach((i) => {
-            /** @type {HTMLInputElement} */ (i).checked = false;
-        });
-    }
-
-    // Type de contrainte ↩︎ première option
-    const typeSel = /** @type {HTMLSelectElement|null} */ (document.getElementById("constraintType"));
-    if (typeSel) typeSel.selectedIndex = 0;
-
-    // Paramètre (k/d) vidé puis UI remise à jour
-    const p = /** @type {HTMLInputElement|null} */ (document.getElementById("cstParam"));
-    if (p) p.value = "";
-
-    // Recalcule “k / d / aide” selon le type par défaut
-    onConstraintTypeChange();
-
-    // Focus ergonomique
-    (sel ?? typeSel)?.focus();
-}
-
-
-/** Formate une liste de noms "A, B et C". */
+/** Formatte “Alice DURAND, Bob MARTIN et Chloé DUPONT”. */
 function formatNamesList(ids /**: number[] */) /**: string */ {
-    const byId = new Map(state.students.map(s => [s.id, s]));
+    const byId = new Map(state.students.map((s) => [s.id, s]));
     const names = ids
-        .map(id => byId.get(id))
+        .map((id) => byId.get(id))
         .filter(Boolean)
-        .map(s => `${s.first} ${s.last}`.trim());
+        .map((s) => `${s.first} ${s.last}`.trim());
 
     if (names.length <= 1) return names[0] || "";
     const head = names.slice(0, -1).join(", ");
     return `${head} et ${names[names.length - 1]}`;
 }
 
-/** Produit les combinaisons non ordonnées de 2 éléments parmi un tableau d’ids. */
+/** Toutes les paires non ordonnées de 2 éléments parmi ids. */
 function pairs(ids /**: number[] */) /**: Array<[number,number]> */ {
     const out = [];
     for (let i = 0; i < ids.length; i++) {
-        for (let j = i + 1; j < ids.length; j++) {
-            out.push([ids[i], ids[j]]);
-        }
+        for (let j = i + 1; j < ids.length; j++) out.push([ids[i], ids[j]]);
     }
     return out;
 }
 
-/** Génère un identifiant de lot simple (unique assez pour l’UI). */
+/** ID de lot simple et suffisamment unique pour l’IHM. */
 function newBatchId() {
     return "b" + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
 }
 
+/** Affiche/masque le bloc du paramètre (k/d). */
+function toggleParamBlock(show) {
+    const wrap = document.getElementById("cstParamInner") || document.getElementById("cstParamWrap");
+    if (!wrap) return;
+    if (show) {
+        wrap.classList.remove("d-none");
+        wrap.removeAttribute("hidden");
+    } else {
+        wrap.classList.add("d-none");
+        wrap.setAttribute("hidden", "true");
+    }
+}
+
+/** Récupère le nom affichable d’un élève à partir de son id. */
+function displayNameById(id /**: number */) /**: string */ {
+    const s = state.students.find((st) => st.id === id);
+    return s ? `${s.first} ${s.last}`.trim() : `élève #${id}`;
+}
+
+/** Humanise une contrainte individuelle non batchée (fallback legacy). */
+function humanizeConstraint(c /**: any */) /**: string */ {
+    switch (c.type) {
+        case "forbid_seat":
+            return c.human || `siège (x=${c.x}, y=${c.y}, s=${c.s}) doit rester vide`;
+        case "front_rows":
+            return `${displayNameById(c.a)} doit être dans les premières rangées (k=${c.k ?? "?"})`;
+        case "back_rows":
+            return `${displayNameById(c.a)} doit être dans les dernières rangées (k=${c.k ?? "?"})`;
+        case "solo_table":
+            return `${displayNameById(c.a)} doit être isolé·e sur une table`;
+        case "empty_neighbor":
+            return `${displayNameById(c.a)} doit avoir au moins un siège vide à côté`;
+        case "no_adjacent":
+            return `${displayNameById(c.a)} ne doit avoir aucun·e voisin·e adjacent·e`;
+        case "same_table":
+            return `${displayNameById(c.a)} et ${displayNameById(c.b)} doivent être à la même table`;
+        case "far_apart":
+            return `${displayNameById(c.a)} et ${displayNameById(c.b)} doivent être éloigné·e·s d’au moins d=${c.d ?? "?"}`;
+        default:
+            return c.human || c.type || "(contrainte)";
+    }
+}
+
+/* ==========================================================================
+   Sélecteurs d’élèves (desktop + mobile)
+   ========================================================================== */
+
+/** Remplit la liste d’élèves en conservant la sélection courante. */
 export function refreshConstraintSelectors() {
-    // Desktop select multiple
+    // Desktop : <select multiple>
     const sel = /** @type {HTMLSelectElement|null} */ (document.getElementById("cstStudents"));
-    // Mobile list-group with checkboxes
+    // Mobile : liste de checkboxes
     const mob = /** @type {HTMLElement|null} */ (document.getElementById("cstStudentsMobile"));
 
-    const studentsSorted = [...state.students].sort(compareByLastThenFirst);
-
-    // Mémoriser la sélection courante (desktop ou mobile) pour la restaurer
+    const studentsSorted = getStudentsSorted();
     const previouslySelected = new Set(getSelectedStudentIds());
 
-    // ---- Desktop : <select multiple>
     if (sel) {
         sel.innerHTML = "";
         for (const st of studentsSorted) {
@@ -131,19 +138,16 @@ export function refreshConstraintSelectors() {
         }
     }
 
-    // ---- Mobile : cases à cocher
     if (mob) {
         mob.innerHTML = "";
         for (const st of studentsSorted) {
-            const id = String(st.id);
-
             const wrap = document.createElement("label");
             wrap.className = "list-group-item d-flex align-items-center gap-2 py-2";
 
             const input = document.createElement("input");
             input.type = "checkbox";
             input.className = "form-check-input m-0";
-            input.value = id;
+            input.value = String(st.id);
             input.checked = previouslySelected.has(st.id);
 
             const txt = document.createElement("span");
@@ -157,33 +161,22 @@ export function refreshConstraintSelectors() {
     }
 }
 
+/* ==========================================================================
+   Formulaire : type/k/d + reset
+   ========================================================================== */
 
-function toggleParamBlock(show) {
-    const wrap = document.getElementById("cstParamInner") || document.getElementById("cstParamWrap");
-    if (!wrap) return;
-    if (show) {
-        wrap.classList.remove("d-none");
-        wrap.removeAttribute("hidden");
-    } else {
-        wrap.classList.add("d-none");
-        wrap.setAttribute("hidden", "true");
-    }
-}
-
-/** Version blindée (Chrome/Mobile OK) */
+/** Met à jour l’UI du paramètre selon le type (k pour front/back, d pour far_apart). */
 export function onConstraintTypeChange() {
     const typeSel = /** @type {HTMLSelectElement|null} */ (document.getElementById("constraintType"));
     const pLabel = /** @type {HTMLElement|null} */        (document.getElementById("cstParamLabel"));
     const pHelp = /** @type {HTMLElement|null} */        (document.getElementById("cstParamHelp"));
     const pInput = /** @type {HTMLInputElement|null} */   (document.getElementById("cstParam"));
-
-    if (!typeSel || !pLabel || !pHelp || !pInput) return; // UI pas prête → on sort proprement
+    if (!typeSel || !pLabel || !pHelp || !pInput) return;
 
     const t = typeSel.value;
-    const needsK = (t === "front_rows" || t === "back_rows");
-    const needsD = (t === "far_apart");
+    const needsK = t === "front_rows" || t === "back_rows";
+    const needsD = t === "far_apart";
 
-    // k : nombre de rangées (entier >= 1)
     if (needsK) {
         toggleParamBlock(true);
         pLabel.textContent = "k (nombre de rangées)";
@@ -195,7 +188,6 @@ export function onConstraintTypeChange() {
         return;
     }
 
-    // d : distance Manhattan (entier >= 2, borné par computeMaxManhattan si pertinent)
     if (needsD) {
         toggleParamBlock(true);
         const maxD = computeMaxManhattan(state.schema) || 0;
@@ -212,7 +204,7 @@ export function onConstraintTypeChange() {
         }
 
         const cur = Number(pInput.value);
-        pInput.value = (Number.isFinite(cur) && cur >= 2) ? String(cur) : "2";
+        pInput.value = Number.isFinite(cur) && cur >= 2 ? String(cur) : "2";
         return;
     }
 
@@ -226,17 +218,43 @@ export function onConstraintTypeChange() {
     pHelp.textContent = "";
 }
 
+/** Réinitialise le formulaire (sélections, type, paramètre) et remet le focus. */
+export function cancelConstraintForm() {
+    // Desktop
+    const sel = /** @type {HTMLSelectElement|null} */ (document.getElementById("cstStudents"));
+    if (sel) sel.selectedIndex = -1;
+
+    // Mobile
+    const mob = /** @type {HTMLElement|null} */ (document.getElementById("cstStudentsMobile"));
+    if (mob) {
+        mob.querySelectorAll('input[type="checkbox"]').forEach((i) => {
+            /** @type {HTMLInputElement} */ (i).checked = false;
+        });
+    }
+
+    const typeSel = /** @type {HTMLSelectElement|null} */ (document.getElementById("constraintType"));
+    if (typeSel) typeSel.selectedIndex = 0;
+
+    const p = /** @type {HTMLInputElement|null} */ (document.getElementById("cstParam"));
+    if (p) p.value = "";
+
+    onConstraintTypeChange();
+    (sel ?? typeSel)?.focus();
+}
+
+/* ==========================================================================
+   Création de contraintes (lots)
+   ========================================================================== */
+
 /**
- * Ajoute un ou plusieurs éléments dans state.constraints à partir d’un GROUPE.
- *
- * - Contraintes unaires  : 1 entrée / élève sélectionné
- * - Contraintes binaires : 1 entrée / paire du groupe (C(n,2))
- *
- * Un "batch_id" commun est affecté à toutes les entrées générées.
- * On pousse aussi un "marqueur" _batch_marker_ (UI only) pour l’affichage/suppression groupés.
+ * Ajoute des contraintes à partir d’un GROUPE d’élèves :
+ *  - unaires  : 1 entrée par élève
+ *  - binaires : 1 entrée par paire du groupe (C(n,2))
+ * Les entrées générées reçoivent un batch_id commun + insertion d’un _batch_marker_.
  */
 export function addConstraint() {
-    const t = /** @type {HTMLSelectElement} */ (document.getElementById("constraintType")).value;
+    const typeSel = /** @type {HTMLSelectElement} */ (document.getElementById("constraintType"));
+    const t = typeSel.value;
     const selectedIds = getSelectedStudentIds();
 
     const isUnary = ["front_rows", "back_rows", "solo_table", "empty_neighbor", "no_adjacent"].includes(t);
@@ -255,11 +273,12 @@ export function addConstraint() {
     const pValRaw = pInput?.value ? Number(pInput.value) : null;
 
     const maxD = computeMaxManhattan(state.schema);
-    const d = (t === "far_apart") ? Math.min(Math.max(2, pValRaw || 2), Math.max(2, maxD)) : null; // min 2 cohérent avec le label
+    const d = t === "far_apart" ? Math.min(Math.max(2, pValRaw || 2), Math.max(2, maxD)) : null;
     const k = (t === "front_rows" || t === "back_rows") ? Math.max(1, pValRaw ?? 1) : null;
 
     const batch_id = newBatchId();
     const namesPlural = formatNamesList(selectedIds);
+
     let batch_human = "";
     switch (t) {
         case "front_rows":
@@ -275,17 +294,19 @@ export function addConstraint() {
             batch_human = `${namesPlural} doivent avoir au moins un siège vide à côté`;
             break;
         case "no_adjacent":
-            batch_human = `${namesPlural} ne doivent avoir aucun voisin adjacent`;
+            batch_human = `${namesPlural} ne doivent avoir aucun·e voisin·e adjacent·e`;
             break;
         case "same_table":
             batch_human = `${namesPlural} doivent être à la même table`;
             break;
         case "far_apart":
-            batch_human = `${namesPlural} doivent être éloigné·e·s d’une distance d’au moins d=${d ?? "?"} entre eux/elles`;
+            batch_human = `${namesPlural} doivent être éloigné·e·s d’une distance d’au moins d=${d ?? "?"}`;
             break;
     }
 
+    /** @type {any[]} */
     const payloads = [];
+
     if (isUnary) {
         for (const a of selectedIds) {
             const c = /** @type {any} */ ({type: t, a, batch_id, human: ""});
@@ -293,13 +314,10 @@ export function addConstraint() {
             payloads.push(c);
         }
     } else {
-        for (let i = 0; i < selectedIds.length; i++) {
-            for (let j = i + 1; j < selectedIds.length; j++) {
-                const a = selectedIds[i], b = selectedIds[j];
-                const c = /** @type {any} */ ({type: t, a, b, batch_id, human: ""});
-                if (d != null) c.d = d;
-                payloads.push(c);
-            }
+        for (const [a, b] of pairs(selectedIds)) {
+            const c = /** @type {any} */ ({type: t, a, b, batch_id, human: ""});
+            if (d != null) c.d = d;
+            payloads.push(c);
         }
     }
 
@@ -310,37 +328,84 @@ export function addConstraint() {
 }
 
 /* ==========================================================================
-   Rendu + suppression (gère les lots)
+   Rendu + suppression
    ========================================================================== */
 
 /**
- * Affiche la liste des contraintes :
- * - Les éléments marqués "_batch_marker_" représentent un lot (affichage au pluriel).
- * - Le clic "✕" sur un lot supprime toutes les contraintes partageant batch_id + le marqueur.
- * - Les contraintes unitaires "forbid_seat" restent individuelles (inchangé).
+ * Affiche :
+ *  - les lots (marqueurs _batch_marker_) avec un bouton ✕ qui supprime tout le lot,
+ *  - les contraintes individuelles sans batch_id (ex. forbid_seat) avec ✕ dédié.
+ * Met aussi à jour l’UI (room, students, boutons) quand on supprime.
  */
 export function renderConstraints() {
     const root = /** @type {HTMLElement|null} */ ($("#constraintsList"));
     if (!root) return;
     root.innerHTML = "";
 
-    // Rendre les lots (marqueurs)
-    const markers = state.constraints.filter(c => c.type === "_batch_marker_");
+    // --- 1) Lots (marqueurs) ---
+    const markers = state.constraints.filter((c) => c.type === "_batch_marker_");
     for (const m of markers) {
         const item = document.createElement("div");
         item.className = "constraint-pill me-2 mb-2 d-inline-flex align-items-center gap-2";
-        item.textContent = m.human || "(lot)";
+        item.setAttribute("role", "group");
+        item.setAttribute("aria-label", "Lot de contraintes");
+        item.dataset.batchId = m.batch_id;
+
+        const text = document.createElement("span");
+        text.textContent = m.human || "(lot)";
+        item.appendChild(text);
 
         const del = document.createElement("button");
         del.className = "btn btn-sm btn-outline-danger";
+        del.type = "button";
+        del.setAttribute("aria-label", "Supprimer ce lot de contraintes");
         del.textContent = "✕";
         del.addEventListener("click", () => {
-            // supprime toutes les contraintes du lot + le marqueur
             const bid = m.batch_id;
-            state.constraints = state.constraints.filter(c => c.batch_id !== bid && c !== m);
+            state.constraints = state.constraints.filter((c) => c.batch_id !== bid && c !== m);
             renderConstraints();
             updateBanButtonLabel();
-            renderRoom(); // au cas où certaines contraintes influencent un futur rendu
+            renderRoom();
+        });
+
+        item.appendChild(del);
+        root.appendChild(item);
+    }
+
+    // --- 2) Contraintes individuelles sans batch_id (legacy / forbid_seat / directes) ---
+    const singles = state.constraints.filter(
+        (c) => c.type !== "_batch_marker_" && !c.batch_id
+    );
+
+    for (const c of singles) {
+        const item = document.createElement("div");
+        item.className = "constraint-pill me-2 mb-2 d-inline-flex align-items-center gap-2";
+        item.setAttribute("role", "group");
+        item.setAttribute("aria-label", "Contrainte");
+
+        const text = document.createElement("span");
+        text.textContent = humanizeConstraint(c);
+        item.appendChild(text);
+
+        const del = document.createElement("button");
+        del.className = "btn btn-sm btn-outline-danger";
+        del.type = "button";
+        del.setAttribute("aria-label", "Supprimer cette contrainte");
+        del.textContent = "✕";
+        del.addEventListener("click", () => {
+            // Siège interdit : tenir à jour le Set state.forbidden
+            if (c.type === "forbid_seat") {
+                const k = c.key || (Number.isFinite(c.x) && Number.isFinite(c.y) && Number.isFinite(c.s) ? `${c.x},${c.y},${c.s}` : null);
+                if (k) state.forbidden.delete(k);
+            }
+            // Retire la contrainte de l’array
+            const idx = state.constraints.indexOf(c);
+            if (idx >= 0) state.constraints.splice(idx, 1);
+
+            renderConstraints();
+            renderRoom();
+            renderStudents();
+            updateBanButtonLabel();
         });
 
         item.appendChild(del);

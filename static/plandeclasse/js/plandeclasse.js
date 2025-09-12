@@ -2,183 +2,245 @@
 "use strict";
 
 /**
- * Point d’entrée : branche les listeners et effectue les premiers rendus.
- * Ce fichier est le seul référencé dans le template (type="module").
+ * @file Point d’entrée de l’application "plan de classe".
+ * Branche les écouteurs d’événements et déclenche les premiers rendus.
+ * Ce module est le SEUL chargé dans le template (type="module").
+ *
  */
 
-import {state} from "./state.js";
+import {state as etat} from "./state.js";
 import {$} from "./utils.js";
-import {renderRoom, renderStudents, updateBanButtonLabel} from "./render.js";
-import {
-    refreshConstraintSelectors,
-    onConstraintTypeChange,
-    addConstraint,
-    cancelConstraintForm,
-    renderConstraints
-} from "./constraints.js";
-import {onCanvasClick, resetPlanKeepRoom, toggleSelectedSeatBan, unassignSelected} from "./interactions.js";
-import {applySchema, reconcileAfterSchemaChange, renderRowsEditor, resetRoomSchema} from "./schema.js";
-import {setupExportUI, startExport} from "./export.js";
-import {setupSolveUI, syncSolveButtonEnabled, startSolve} from "./solver.js";
-import {setupUnifiedImport} from "./importers.js";
 
+// Rendus & UI
+import {
+    renderRoom as rendreSalle,
+    renderStudents as rendreEleves,
+    updateBanButtonLabel as majBoutonBan,
+} from "./render.js";
+
+// Contraintes
+import {
+    refreshConstraintSelectors as rafraichirSelecteursContraintes,
+    onConstraintTypeChange as surChangementTypeContrainte,
+    addConstraint as ajouterContrainte,
+    cancelConstraintForm as annulerFormContrainte,
+    renderConstraints as rendreContraintes,
+} from "./constraints.js";
+
+// Interactions (clics, bannissement, désaffectation)
+import {
+    onCanvasClick as surClicCanvas,
+    resetPlanKeepRoom as reinitialiserPlanSeulement,
+    toggleSelectedSeatBan as basculerSiegeInterdit,
+    unassignSelected as desaffecterSelection,
+} from "./interactions.js";
+
+// Schéma de salle
+import {
+    applySchema as appliquerSchema,                // (importé si besoin ailleurs)
+    reconcileAfterSchemaChange as recalerApresSchema,
+    renderRowsEditor as rendreEditeurRangees,
+    resetRoomSchema as reinitialiserSchemaSalle,
+} from "./schema.js";
+
+// Export
+import {
+    setupExportUI as preparerUIExport,
+    startExport as demarrerExport,
+} from "./export.js";
+
+// Solveur
+import {
+    setupSolveUI as preparerUISolveur,
+    syncSolveButtonEnabled as syncBoutonSolve,
+    startSolve as demarrerSolve,
+} from "./solver.js";
+
+// Import CSV/JSON unifié
+import {setupUnifiedImport as preparerImportUnifie} from "./importers.js";
 
 /**
- * Réinitialise le plan de classe SANS toucher à la salle :
- * - supprime toutes les affectations (placements + index inverse),
- * - nettoie la sélection,
- * - met l'UI à jour.
+ * Réinitialise le plan de classe SANS toucher au schéma de salle.
+ * - Supprime toutes les affectations (seatKey -> studentId) et l’index inverse.
+ * - Efface la sélection courante (élève/siège).
+ * - Rafraîchit l’UI et l’état des boutons dépendants.
+ *
+ * Utile si l’on veut repartir d’un plan vierge en gardant la salle telle quelle.
  */
-function resetPlanOnly() {
-    state.placements.clear();
-    state.placedByStudent.clear();
-    state.selection.studentId = null;
-    state.selection.seatKey = null;
+function reinitialiserPlanInterne() {
+    etat.placements.clear();
+    etat.placedByStudent.clear();
+    etat.selection.studentId = null;
+    etat.selection.seatKey = null;
 
-    renderRoom();
-    renderStudents();
-    renderConstraints();
-    updateBanButtonLabel();
-    // Si les badges/tooltip de "générer" dépendent de l'état : on resynchronise
-    syncSolveButtonEnabled();
+    rendreSalle();
+    rendreEleves();
+    rendreContraintes();
+    majBoutonBan();
+    // Si des tooltips / badges dépendent de l’état, on resynchronise.
+    syncBoutonSolve();
 }
 
+/**
+ * Initialise l’application :
+ * - Branche tous les écouteurs,
+ * - Prépare les UIs auxiliaires (export, solveur, import),
+ * - Lance les rendus initiaux.
+ */
+function initialiser() {
+    // --- Solveur : démarrage du calcul
+    const boutonSolve = document.getElementById("btnSolve");
+    boutonSolve?.addEventListener("click", demarrerSolve);
 
-function init() {
-    // Solve
-    const btnSolve = document.getElementById("btnSolve");
-    btnSolve?.addEventListener("click", startSolve);
-
-    // Colonne élèves (toggle)
+    // --- Ouverture/fermeture de la colonne Élèves
     document.getElementById("toggleStudentsPanel")?.addEventListener("click", () => {
         document.getElementById("pc-root")?.classList.toggle("students-hidden");
-        renderRoom(); // recalcule le viewport après changement de layout
+        // Le viewport dépend de la largeur dispo : on rerend la salle.
+        rendreSalle();
     });
 
-    // Canvas SVG (délégué)
+    // --- Canvas SVG (délégation de clic vers gestionnaire)
     const canvas = document.getElementById("roomCanvas");
-    if (canvas) canvas.addEventListener("click", onCanvasClick);
+    if (canvas) canvas.addEventListener("click", surClicCanvas);
 
-    // >>> Import unifié (CSV ou JSON)
-    setupUnifiedImport();
+    // --- Import unifié (CSV Pronote / JSON d’export)
+    preparerImportUnifie();
 
+    // --- Ajout de rangées (éditeur rapide)
     $("#btnAddRow")?.addEventListener("click", (ev) => {
         ev.preventDefault();
-        const capsStr = /** @type {HTMLInputElement} */($("#rowCapacities")).value;
-        const caps = capsStr.split(/[,\s]+/)
-            .map(s => Number(s.trim()))
-            .filter(n => Number.isFinite(n) && n !== 0);
-        if (caps.length === 0) return;
 
-        const nInput = /** @type {HTMLInputElement|null} */ ($("#rowsCount"));
-        const n = Math.max(1, Number(nInput?.value ?? 1) || 1);
+        const saisieCapacites = /** @type {HTMLInputElement} */ ($("#rowCapacities"));
+        const texteCaps = saisieCapacites?.value ?? "";
+        const capacites = texteCaps
+            .split(/[,\s]+/)
+            .map((s) => Number(s.trim()))
+            .filter((n) => Number.isFinite(n) && n !== 0);
 
-        for (let k = 0; k < n; k++) state.schema.push(caps.slice());
+        if (capacites.length === 0) return;
 
-        reconcileAfterSchemaChange();
-        syncSolveButtonEnabled();
+        const champNb = /** @type {HTMLInputElement|null} */ ($("#rowsCount"));
+        const nb = Math.max(1, Number(champNb?.value ?? 1) || 1);
+
+        for (let k = 0; k < nb; k++) etat.schema.push(capacites.slice());
+
+        recalerApresSchema();
+        syncBoutonSolve();
     });
 
+    // --- Nettoyage total de la salle (schéma + états dépendants)
     $("#btnClearRoom")?.addEventListener("click", () => {
-        state.schema = [];
-        state.forbidden.clear();
-        state.placements.clear();
-        state.placedByStudent.clear();
-        state.selection.studentId = null;
-        state.selection.seatKey = null;
-        renderRoom();
-        renderStudents();
-        renderConstraints();
-        updateBanButtonLabel();
-        syncSolveButtonEnabled();
-        renderRowsEditor();
+        etat.schema = [];
+        etat.forbidden.clear();
+        etat.placements.clear();
+        etat.placedByStudent.clear();
+        etat.selection.studentId = null;
+        etat.selection.seatKey = null;
+
+        rendreSalle();
+        rendreEleves();
+        rendreContraintes();
+        majBoutonBan();
+        syncBoutonSolve();
+        rendreEditeurRangees();
     });
 
-    // Options solveur
-    (/** @type {HTMLInputElement} */($("#optMixage")))?.addEventListener("change", (e) => (state.options.prefer_mixage = e.target.checked));
-    (/** @type {HTMLInputElement} */($("#optSolo")))?.addEventListener("change", (e) => (state.options.prefer_alone = e.target.checked));
+    // --- Options de solveur
+    (/** @type {HTMLInputElement} */ ($("#optMixage")))?.addEventListener(
+        "change",
+        (e) => (etat.options.prefer_mixage = e.target.checked),
+    );
+    (/** @type {HTMLInputElement} */ ($("#optSolo")))?.addEventListener(
+        "change",
+        (e) => (etat.options.prefer_alone = e.target.checked),
+    );
 
-    // Affichage des noms
-    (/** @type {HTMLInputElement} */($("#nvPrenom")))?.addEventListener("change", () => {
-        state.nameView = "first";
-        renderRoom();
+    // --- Affichage des noms (prénom / nom / les deux)
+    (/** @type {HTMLInputElement} */ ($("#nvPrenom")))?.addEventListener("change", () => {
+        etat.nameView = "first";
+        rendreSalle();
     });
-    (/** @type {HTMLInputElement} */($("#nvNom")))?.addEventListener("change", () => {
-        state.nameView = "last";
-        renderRoom();
+    (/** @type {HTMLInputElement} */ ($("#nvNom")))?.addEventListener("change", () => {
+        etat.nameView = "last";
+        rendreSalle();
     });
-    (/** @type {HTMLInputElement} */($("#nvPrenomNom")))?.addEventListener("change", () => {
-        state.nameView = "both";
-        renderRoom();
+    (/** @type {HTMLInputElement} */ ($("#nvPrenomNom")))?.addEventListener("change", () => {
+        etat.nameView = "both";
+        rendreSalle();
     });
 
-    // Actions siège
-    $("#btnToggleBan")?.addEventListener("click", toggleSelectedSeatBan);
-    $("#btnUnassign")?.addEventListener("click", unassignSelected);
+    // --- Actions liées au siège sélectionné
+    $("#btnToggleBan")?.addEventListener("click", basculerSiegeInterdit);
+    $("#btnUnassign")?.addEventListener("click", desaffecterSelection);
 
-    // Recherche élève
-    $("#studentSearch")?.addEventListener("input", renderStudents);
+    // --- Recherche d’élèves
+    $("#studentSearch")?.addEventListener("input", rendreEleves);
 
-    // Formulaire contraintes
-    $("#constraintType")?.addEventListener("change", onConstraintTypeChange);
-    $("#btnAddConstraint")?.addEventListener("click", addConstraint);
+    // --- Formulaire de contraintes (type + ajout + reset)
+    $("#constraintType")?.addEventListener("change", surChangementTypeContrainte);
+    $("#btnAddConstraint")?.addEventListener("click", ajouterContrainte);
+    document.getElementById("btnCancelConstraint")?.addEventListener("click", annulerFormContrainte);
 
-    (/** @type {HTMLInputElement} */($("#optLockPlacements")))
-        ?.addEventListener("change", (e) => (state.options.lock_placements = e.target.checked));
-    state.options.lock_placements = !!document.getElementById("optLockPlacements")?.checked;
+    // Verrouillage des placements (option)
+    (/** @type {HTMLInputElement} */ ($("#optLockPlacements")))
+        ?.addEventListener("change", (e) => (etat.options.lock_placements = e.target.checked));
+    etat.options.lock_placements = !!document.getElementById("optLockPlacements")?.checked;
 
-    document.getElementById("btnCancelConstraint")?.addEventListener("click", cancelConstraintForm);
-    // Export
-    document.getElementById("btnExport")?.addEventListener("click", startExport);
-    setupExportUI();
+    // --- Export
+    document.getElementById("btnExport")?.addEventListener("click", demarrerExport);
+    preparerUIExport();
 
-    // Solve UI helpers (enable/tooltip)
-    setupSolveUI();
-    syncSolveButtonEnabled();
+    // --- Solveur : helpers (activation + tooltip)
+    preparerUISolveur();
+    syncBoutonSolve();
 
-    // Rendus initiaux
-    renderRoom();
-    renderStudents();
+    // --- Rendus initiaux (salle + élèves + contraintes + éditeur de rangées)
+    rendreSalle();
+    rendreEleves();
     try {
-        refreshConstraintSelectors();
-        onConstraintTypeChange(); // ← ne casse plus si un id manque
+        rafraichirSelecteursContraintes();
+        surChangementTypeContrainte(); // sécurisé si un id manque
     } catch (e) {
         console.error("init constraints failed", e);
     }
-    renderRowsEditor();
+    rendreEditeurRangees();
 
-    // Bootstrap tooltips
-    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
-        // @ts-ignore: bootstrap global
+    // --- Tooltips Bootstrap (progressifs)
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
+        // @ts-ignore bootstrap global
         new bootstrap.Tooltip(el);
     });
 
-    const btnResetPlan = document.getElementById("btnResetPlan");
-    if (btnResetPlan && !btnResetPlan.dataset.wired) {
-        btnResetPlan.dataset.wired = "1";
-        btnResetPlan.addEventListener("click", (ev) => {
+    // --- Bouton : réinitialiser uniquement le plan (garde le schéma)
+    const boutonResetPlan = document.getElementById("btnResetPlan");
+    if (boutonResetPlan && !boutonResetPlan.dataset.wired) {
+        boutonResetPlan.dataset.wired = "1";
+        boutonResetPlan.addEventListener("click", (ev) => {
             ev.preventDefault();
-            resetPlanKeepRoom();
+            reinitialiserPlanSeulement(); // garde la cohérence avec interactions.js
         });
     }
 
-    // Réinitialiser la **salle** (schéma)
-    const btnResetRoomSchema = document.getElementById("btnResetRoomSchema");
-    if (btnResetRoomSchema && !btnResetRoomSchema.dataset.wired) {
-        btnResetRoomSchema.dataset.wired = "1";
-        btnResetRoomSchema.addEventListener("click", (ev) => {
+    // --- Bouton : réinitialiser le schéma de salle (vide la salle)
+    const boutonResetSchema = document.getElementById("btnResetRoomSchema");
+    if (boutonResetSchema && !boutonResetSchema.dataset.wired) {
+        boutonResetSchema.dataset.wired = "1";
+        boutonResetSchema.addEventListener("click", (ev) => {
             ev.preventDefault();
-            resetRoomSchema();
-            // Après une salle vide, le bouton "générer" ne doit pas permettre un solve
-            syncSolveButtonEnabled();
-            renderRowsEditor();
+            reinitialiserSchemaSalle();
+            // Après une salle vide, on ne doit plus pouvoir lancer un solve tant que non prête
+            syncBoutonSolve();
+            rendreEditeurRangees();
         });
     }
 
+    // --- Synchronisation initiale des options mixage/solo (selon checkboxes)
     const optMix = /** @type {HTMLInputElement|null} */ (document.getElementById("optMixage"));
     const optSolo = /** @type {HTMLInputElement|null} */ (document.getElementById("optSolo"));
-    if (optMix) state.options.prefer_mixage = !!optMix.checked;
-    if (optSolo) state.options.prefer_alone = !!optSolo.checked;
+    if (optMix) etat.options.prefer_mixage = !!optMix.checked;
+    if (optSolo) etat.options.prefer_alone = !!optSolo.checked;
 }
 
-window.addEventListener("DOMContentLoaded", init);
+// Démarrage une fois le DOM prêt
+window.addEventListener("DOMContentLoaded", initialiser);
+

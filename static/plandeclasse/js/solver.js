@@ -3,40 +3,46 @@
 
 /**
  * Module Solver :
- * - sérialisation du payload, démarrage du job, polling,
- * - application de la solution (assignments),
- * - affichage liens d’export (géré ailleurs),
- * - + gestion de l’activation du bouton "générer" selon l’état (élèves + schéma).
+ * - sérialisation du payload,
+ * - démarrage du calcul côté backend,
+ * - polling de l'état,
+ * - application de la solution et exposition des liens d'export,
+ * - gestion de l’activation du bouton "générer" selon l’état (élèves + schéma).
+ *
+ * Sécurité/CSP : pas d’HTML injecté, pas de style inline.
  */
 
-import {state} from "./state.js";
-import {renderRoom, renderStudents, updateBanButtonLabel} from "./render.js";
+import {state as etat} from "./state.js";
+import {
+    renderRoom as rendreSalle,
+    renderStudents as rendreEleves,
+    updateBanButtonLabel as majBoutonBan
+} from "./render.js";
 
 /* ==========================================================================
-   Eligibility (bouton "générer le plan")
+   Préconditions (btn "générer")
    ========================================================================== */
 
-/** Retourne true si au moins une table **/
-function schemaIsReady() {
-    const sch = state.schema;
+/** Retourne true si le schéma contient au moins une table réelle (>0). */
+function schemaPret() {
+    const sch = etat.schema;
     if (!Array.isArray(sch) || sch.length === 0) return false;
-    for (const row of sch) {
-        if (!Array.isArray(row) || row.length === 0) return false;
-        const hasRealTable = row.some((cap) => Number.isFinite(cap) && cap > 0);
-        if (!hasRealTable) return false;
+    for (const rangee of sch) {
+        if (!Array.isArray(rangee) || rangee.length === 0) return false;
+        const aUneTable = rangee.some((cap) => Number.isFinite(cap) && cap > 0);
+        if (!aUneTable) return false;
     }
     return true;
 }
 
-
 /** Retourne true si au moins 1 élève est chargé. */
-function studentsAreLoaded() {
-    return Array.isArray(state.students) && state.students.length > 0;
+function elevesCharges() {
+    return Array.isArray(etat.students) && etat.students.length > 0;
 }
 
 /**
- * Met à jour l’état enabled/disabled du bouton #btnSolve + tooltip d’explication sur #solveBtnWrap.
- * Appeler cette fonction après chaque modification du CSV, du schéma, ou reset.
+ * Met à jour l’état enabled/disabled du bouton #btnSolve + tooltip explicatif.
+ * À appeler après tout changement CSV/schéma/reset.
  */
 export function syncSolveButtonEnabled() {
     /** @type {HTMLButtonElement|null} */
@@ -45,32 +51,24 @@ export function syncSolveButtonEnabled() {
     const wrap = document.getElementById("solveBtnWrap");
     if (!btn) return;
 
-    // --- Vérifie la présence d'élèves chargés ---
-    const hasStudents = Array.isArray(state.students) && state.students.length > 0;
+    const okEleves = elevesCharges();
+    const okSchema = schemaPret();
+    const pret = okEleves && okSchema;
+    btn.disabled = !pret;
 
-    // --- Vérifie qu'un schéma valide est défini (>= 1 rangée, capacités > 0) ---
-    const hasSchema = schemaIsReady();
-
-    // --- État final : prêt si élèves + schéma ---
-    const ready = hasStudents && hasSchema;
-    btn.disabled = !ready;
-
-    // --- Tooltip Bootstrap sur le wrapper pour expliquer pourquoi c'est désactivé ---
     if (wrap && window.bootstrap?.Tooltip) {
         const tip = bootstrap.Tooltip.getOrCreateInstance(wrap, {
             trigger: "hover focus",
             placement: "top",
-            title: wrap.getAttribute("title") || "", // contenu par défaut (sera mis à jour)
+            title: wrap.getAttribute("title") || "",
         });
 
-        if (!ready) {
-            // Message conditionnel (pédagogique)
+        if (!pret) {
             let msg = "Préparez le calcul : ";
-            if (!hasStudents && !hasSchema) msg += "chargez un CSV/JSON et appliquez un schéma de salle.";
-            else if (!hasStudents) msg += "chargez un CSV/JSON d’élèves.";
+            if (!okEleves && !okSchema) msg += "chargez un CSV/JSON et appliquez un schéma de salle.";
+            else if (!okEleves) msg += "chargez un CSV/JSON d’élèves.";
             else msg += "appliquez un schéma de salle.";
 
-            // Bootstrap 5.3+ : setContent si disponible, sinon fallback title + update
             if (typeof tip.setContent === "function") {
                 tip.setContent({".tooltip-inner": msg});
             } else {
@@ -78,23 +76,17 @@ export function syncSolveButtonEnabled() {
                 tip.update();
             }
             tip.enable();
-
-            // NE PAS utiliser 'pe-none' : sinon le bouton enfant ne reçoit plus les clics
             wrap.classList.remove("pe-none");
         } else {
-            // Quand tout est prêt : plus de tooltip bloquant
             try {
                 tip.hide();
             } catch {
             }
             tip.disable();
             wrap.classList.remove("pe-none");
-            // Nettoie l’attribut title pour éviter un ancien message résiduel
             wrap.removeAttribute("title");
         }
 
-        // Petit confort : si l'utilisateur clique le wrapper alors que le bouton est
-        // disabled, on affiche brièvement le tooltip pour expliquer quoi faire.
         if (!wrap.dataset.wired) {
             wrap.dataset.wired = "1";
             wrap.addEventListener("click", (ev) => {
@@ -115,116 +107,197 @@ export function syncSolveButtonEnabled() {
         }
     }
 }
+
 /** À appeler au chargement pour initialiser l’état et le tooltip. */
 export function setupSolveUI() {
     syncSolveButtonEnabled();
 }
 
 /* ==========================================================================
-   Solveur : payload + start + polling + application
+   Payload solveur
    ========================================================================== */
 
+/**
+ * Construit le payload à envoyer au solveur.
+ * NB : on remet `placements` à {} pour laisser le solveur repartir “propre”.
+ */
 export function buildSolvePayload() {
     return {
-        schema: state.schema,
-        students: state.students.map(s => ({
+        schema: etat.schema,
+        students: etat.students.map((s) => ({
             id: s.id,
             name: s.name,
             first: s.first,
             last: s.last,
-            gender: s.gender || null
+            gender: s.gender || null,
         })),
-        options: {...state.options, respect_existing: false}, // 👈
-        constraints: state.constraints,
-        forbidden: Array.from(state.forbidden),
-        placements: {}, // 👈 libère les sièges (ou ne mets ici que les “verrouillés” si tu as cette notion)
-        name_view: state.nameView,
+        options: {...etat.options, respect_existing: false}, // libère les sièges
+        constraints: etat.constraints,
+        forbidden: Array.from(etat.forbidden),
+        placements: {}, // ne mettre ici que d’éventuels sièges explicitement verrouillés si vous ajoutez la notion
+        name_view: etat.nameView,
     };
 }
 
-let _pollTimer /**: number|null */ = null;
+/* ==========================================================================
+   Démarrage + polling
+   ========================================================================== */
 
+// États "en cours" côté backend
+const ETATS_EN_COURS = new Set(["PENDING", "RECEIVED", "STARTED", "RETRY"]);
+
+// Garde-fous runtime
+let _pollHandle /**: number|null */ = null;
+let _aborteur /**: AbortController|null */ = null;
+let _solveEnCours = false;
+
+/** Nettoyage commun (fin de polling et réactivation bouton). */
+function nettoyerApresSolve() {
+    if (_pollHandle) {
+        clearTimeout(_pollHandle);
+        _pollHandle = null;
+    }
+    if (_aborteur) {
+        try {
+            _aborteur.abort();
+        } catch {
+        }
+        _aborteur = null;
+    }
+    _solveEnCours = false;
+    const btn = document.getElementById("btnSolve");
+    if (btn) btn.removeAttribute("disabled");
+}
+
+/**
+ * Applique une affectation renvoyée par le solveur au state + rerendu.
+ * @param {Record<string, number>} assignmentObj - mapping "x,y,s" -> studentId
+ */
+export function applyAssignment(assignmentObj) {
+    etat.placements.clear();
+    etat.placedByStudent.clear();
+    for (const [cleSiege, sid] of Object.entries(assignmentObj)) {
+        const idNum = Number(sid);
+        etat.placements.set(cleSiege, idNum);
+        etat.placedByStudent.set(idNum, cleSiege);
+    }
+    rendreSalle();
+    rendreEleves();
+    majBoutonBan();
+}
+
+/**
+ * Démarre le solve côté serveur et gère le polling jusqu’à succès/échec/time-out.
+ * Backoff progressif (800 → 2000 ms).
+ */
 export async function startSolve() {
     const btn = document.getElementById("btnSolve");
-    const statusEl = document.getElementById("solveStatus");
+    const statutEl = document.getElementById("solveStatus");
+    const blocDl = document.getElementById("solveDownloads");
+    const lienPNG = document.getElementById("dlPNG");
+    const lienPDF = document.getElementById("dlPDF");
+    const lienSVG = document.getElementById("dlSVG");
+    const lienTXT = document.getElementById("dlTXT");
 
-    // Sécurité : si non prêt, on ne lance pas (cas de course éventuel)
-    if (!studentsAreLoaded() || !schemaIsReady()) {
+    // Évite les solves concurrents
+    if (_solveEnCours) return;
+
+    // Préconditions
+    if (!elevesCharges() || !schemaPret()) {
         syncSolveButtonEnabled();
         return;
     }
 
-    const dl = document.getElementById("solveDownloads");
-    const dlPNG = document.getElementById("dlPNG");
-    const dlPDF = document.getElementById("dlPDF");
-    const dlSVG = document.getElementById("dlSVG");
-    const dlTXT = document.getElementById("dlTXT");
-
-    statusEl && (statusEl.textContent = "envoi...");
-    if (dl) dl.classList.add("d-none");
-    if (_pollTimer) {
-        clearInterval(_pollTimer);
-        _pollTimer = null;
+    // Réinit UI / états
+    _solveEnCours = true;
+    if (_pollHandle) {
+        clearTimeout(_pollHandle);
+        _pollHandle = null;
     }
+    if (blocDl) blocDl.classList.add("d-none");
+    if (btn) btn.setAttribute("disabled", "true");
+    if (statutEl) statutEl.textContent = "envoi...";
 
-    const body = JSON.stringify(buildSolvePayload());
+    const payload = JSON.stringify(buildSolvePayload());
 
     try {
+        // 1) Démarrage du job
         const r = await fetch("/plandeclasse/solve/start", {
             method: "POST",
             headers: {"Content-Type": "application/json"},
-            body,
+            body: payload,
         });
         if (!r.ok) throw new Error("start failed");
-        const {task_id} = await r.json();
-        statusEl && (statusEl.textContent = "calcul en cours…");
-        if (btn) btn.setAttribute("disabled", "true");
 
-        _pollTimer = setInterval(async () => {
+        const {task_id} = await r.json();
+        if (statutEl) statutEl.textContent = "calcul en cours…";
+
+        // 2) Polling avec backoff et délai max
+        const debut = Date.now();
+        const budgetMs = Number(etat.options?.time_budget_ms) || 60000;
+        const delaiMaxMs = Math.max(2000, budgetMs + 5000); // petite marge de grâce
+        let attenteMs = 800; // backoff de départ
+
+        _aborteur = new AbortController();
+
+        const pollUneFois = async () => {
+            // Time-out global
+            if (Date.now() - debut > delaiMaxMs) {
+                if (statutEl) statutEl.textContent = "échec : délai dépassé";
+                nettoyerApresSolve();
+                return;
+            }
+
             try {
-                const rr = await fetch(`/plandeclasse/solve/status/${task_id}`);
+                const rr = await fetch(`/plandeclasse/solve/status/${task_id}`, {
+                    signal: _aborteur.signal,
+                });
                 const data = await rr.json();
-                if (data.status && ["PENDING", "RECEIVED", "STARTED", "RETRY"].includes(data.status)) {
+
+                // Toujours en cours ?
+                if (data.status && ETATS_EN_COURS.has(data.status)) {
+                    // Replanifie avec backoff plafonné
+                    attenteMs = Math.min(2000, Math.floor(attenteMs * 1.25));
+                    _pollHandle = setTimeout(pollUneFois, attenteMs);
                     return;
                 }
-                clearInterval(_pollTimer);
-                _pollTimer = null;
+
+                // Fini (succès/échec)
                 if (btn) btn.removeAttribute("disabled");
 
                 if (data.status === "SUCCESS") {
+                    // Applique l’affectation
                     applyAssignment(data.assignment || {});
-                    if (data.download && dlPNG && dlPDF && dlSVG && dlTXT && dl) {
-                        dlPNG.href = data.download.png;
-                        dlPDF.href = data.download.pdf;
-                        dlSVG.href = data.download.svg;
-                        dlTXT.href = data.download.txt;
-                        dl.classList.remove("d-none");
+                    // Renseigne les liens si présents
+                    if (data.download && lienPNG && lienPDF && lienSVG && lienTXT && blocDl) {
+                        // @ts-ignore : éléments sont des <a>
+                        lienPNG.href = data.download.png || "#";
+                        // @ts-ignore
+                        lienPDF.href = data.download.pdf || "#";
+                        // @ts-ignore
+                        lienSVG.href = data.download.svg || "#";
+                        // @ts-ignore
+                        lienTXT.href = data.download.txt || "#";
+                        blocDl.classList.remove("d-none");
                     }
-                    statusEl && (statusEl.textContent = "terminé ✔");
+                    if (statutEl) statutEl.textContent = "terminé ✔";
                 } else {
-                    statusEl && (statusEl.textContent = `échec : ${data.error || "aucune solution"}`);
+                    const msg = data.error ? String(data.error) : "aucune solution";
+                    if (statutEl) statutEl.textContent = `échec : ${msg}`;
                 }
+                nettoyerApresSolve();
             } catch (_e) {
-                clearInterval(_pollTimer);
-                _pollTimer = null;
+                // Erreur réseau ou abort → on stoppe proprement
                 if (btn) btn.removeAttribute("disabled");
-                statusEl && (statusEl.textContent = "erreur de polling");
+                if (statutEl) statutEl.textContent = "erreur de polling";
+                nettoyerApresSolve();
             }
-        }, 1000);
-    } catch (_e) {
-        statusEl && (statusEl.textContent = "erreur d’envoi");
-    }
-}
+        };
 
-/** Applique une affectation renvoyée par le solveur. */
-export function applyAssignment(assignmentObj /*: Record<string,number> */) {
-    state.placements.clear();
-    state.placedByStudent.clear();
-    for (const [seatKey, sid] of Object.entries(assignmentObj)) {
-        state.placements.set(seatKey, Number(sid));
-        state.placedByStudent.set(Number(sid), seatKey);
+        // Première itération
+        _pollHandle = setTimeout(pollUneFois, attenteMs);
+    } catch (_e) {
+        if (statutEl) statutEl.textContent = "erreur d’envoi";
+        nettoyerApresSolve();
     }
-    renderRoom();
-    renderStudents();
-    updateBanButtonLabel();
 }
