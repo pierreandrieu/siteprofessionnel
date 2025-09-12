@@ -201,6 +201,20 @@ function importFromExportJSON(data) {
         }
     }
 
+    if (data.options && typeof data.options === "object") {
+        const o = data.options;
+        state.options = {
+            ...state.options, // conserve les valeurs existantes par défaut
+            solver: typeof o.solver === "string" ? o.solver : state.options.solver,
+            prefer_mixage: !!o.prefer_mixage,
+            prefer_alone: !!o.prefer_alone,
+            lock_placements: !!o.lock_placements,
+            time_budget_ms: Number.isFinite(o.time_budget_ms)
+                ? Number(o.time_budget_ms)
+                : state.options.time_budget_ms,
+        };
+    }
+
     refreshAllUI();
 }
 
