@@ -18,21 +18,33 @@
 <body>
 <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
     <div class="container">
-        <a class="navbar-brand" href="{% url 'pages:home' %}">Pierre Andrieu - NSI / SNT</a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav" aria-controls="nav"
-                aria-expanded="false" aria-label="menu">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-        <ul class="navbar-nav ms-auto">
-            <li class="nav-item"><a class="nav-link" href="{% url 'pages:home' %}">Accueil</a></li>
-            <li class="nav-item"><a class="nav-link" href="{% url 'cours:index' %}">Cours</a></li>
-            <li class="nav-item"><a class="nav-link" href="{% url 'plandeclasse:index' %}">Plan de classe</a></li>
-            <li class="nav-item"><a class="nav-link" href="{% url 'pages:initiatives' %}">Initiatives numériques européennes</a>
-            </li>
-            <li class="nav-item"><a class="nav-link" href="{% url 'pages:about' %}">À&nbsp;propos</a></li>
-            <li class="nav-item"><a class="nav-link" href="{% url 'pages:privacy' %}">Vie privée &amp; confidentialité</a>
-            </li>
-        </ul>
+        <nav class="navbar navbar-expand-lg navbar-dark bg-primary py-2">
+            <div class="container">
+                <a class="navbar-brand text-truncate" href="{% url 'pages:home' %}">
+                    Pierre Andrieu <span class="d-none d-sm-inline">- NSI / SNT</span>
+                </a>
+
+
+                <div class="collapse navbar-collapse" id="nav">
+                    <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
+                        <li class="nav-item"><a class="nav-link" href="{% url 'pages:home' %}">Accueil</a></li>
+                        <li class="nav-item"><a class="nav-link" href="{% url 'cours:index' %}">Cours</a></li>
+                        <li class="nav-item"><a class="nav-link" href="{% url 'plandeclasse:index' %}">Plan de
+                            classe</a></li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'pages:initiatives' %}">
+                                <span class="d-inline d-sm-none">Initiatives européennes</span>
+                                <span class="d-none d-sm-inline">Initiatives numériques européennes</span>
+                            </a>
+                        </li>
+                        <li class="nav-item"><a class="nav-link" href="{% url 'pages:about' %}">À&nbsp;propos</a></li>
+                        <li class="nav-item"><a class="nav-link" href="{% url 'pages:privacy' %}">Vie privée &amp;
+                            confidentialité</a></li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+
 
     </div>
 </nav>

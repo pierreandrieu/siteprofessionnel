@@ -100,14 +100,33 @@
             <div class="card-body">
                 <div id="pcHelpRows" class="collapse w-100 mb-3">
                     <div class="pc-help small">
+                        <p class="mb-2">
+                            Une rangée = entiers séparés par des virgules.
+                            <span class="pill">si l'entier est &gt; 0 ==> table de la capacité indiquée </span>
+                            <span class="pill">si l'entier est &lt; 0 ==> vide de la capacité indiquée </span>
+                        </p>
+
                         <ul class="mb-2">
-                            <li><strong>Format :</strong> entiers séparés par des virgules pour une <em>rangée</em>.
+                            <li>
+                                <code>2,3,2</code> →
+                                <span class="pill">table 2</span>
+                                <span class="pill">table 3</span>
+                                <span class="pill">table 2</span>
                             </li>
-                            <li><code>2,3,2</code> → ⟦□□⟧⟦□□□⟧⟦□□⟧ (tables de 2, puis 3, puis 2).</li>
-                            <li><code>2,-3,2</code> → ⟦□□⟧ ⟦···⟧ ⟦□□⟧ (un <em>vide</em>/allée de 3 sièges).</li>
+                            <li>
+                                <code>2,-3,2</code> →
+                                <span class="pill">table 2</span>
+                                <span class="pill">vide 3</span>
+                                <span class="pill">table 2</span>
+                            </li>
                         </ul>
-                        <div class="text-muted">NB : “Ajouter” duplique cette rangée selon « nombre de rangées ».</div>
+
+                        <div class="text-muted">
+                            Astuce : « Ajouter » duplique cette rangée selon « nombre de rangées ».
+                        </div>
                     </div>
+
+
                 </div>
 
                 <div class="row g-2 align-items-end">
@@ -307,8 +326,9 @@
         </div>
 
         <div class="card shadow-sm my-3">
+            <strong class="mb-0">Contraintes</strong>
+
             <div class="card-header py-2 d-flex align-items-center justify-content-between">
-                <strong class="mb-0">Contraintes</strong>
                 <a class="btn btn-sm btn-outline-primary"
                    data-bs-toggle="collapse"
                    href="#pcHelpConstraints"
@@ -324,8 +344,8 @@
                     <div class="pc-help small">
                         <ul class="mb-2">
                             <li><strong>1 — Sélectionner le groupe d’élèves concernés</strong> :
-                                Ctrl (Windows/Linux) <em>ou</em> ⌘ (macOS) pour ajouter/retirer ; Maj pour une plage ;
-                                sur mobile, cocher.
+                                Ctrl (Windows/Linux) <em>ou</em> ⌘ (macOS) pour ajouter/retirer les élèves concernés ;
+                                Sur mobile : cocher.
                             </li>
                             <li><strong>2 — Choisir le type de règle</strong> dans la liste.</li>
                             <li><strong>3 — Renseigner le paramètre</strong> si demandé : <code>k</code> (rangées) ou
@@ -338,15 +358,14 @@
                                 dernières rangées (<code>k</code>), seul sur la table, au moins un siège vide, pas de
                                 voisin.
                             </li>
-                            <li><u>S’appliquent à toutes les paires du groupe</u> : même table, distance ≥
+                            <li><u>S’appliquent à toutes les paires d'élèves sélectionnés</u> : même table, distance ≥
                                 <code>d</code>.
                                 <div class="text-muted mt-1">
                                     Exemple&nbsp;: groupe {Alice, Ben, Chloé, David} avec «&nbsp;distance ≥&nbsp;3&nbsp;».<br>
-                                    Paires vérifiées&nbsp;: (Alice–Ben), (Alice–Chloé), (Alice–David), (Ben–Chloé),
-                                    (Ben–David), (Chloé–David).
-                                    Chacune doit respecter une distance de Manhattan d’au moins 3
-                                    (<a href="https://fr.wikipedia.org/wiki/Distance_de_Manhattan" target="_blank"
-                                        rel="noopener">définition</a>).
+                                    Les paires (Alice–Ben), (Alice–Chloé), (Alice–David), (Ben–Chloé),
+                                    (Ben–David), (Chloé–David) doivent respecter une <a
+                                        href="https://fr.wikipedia.org/wiki/Distance_de_Manhattan" target="_blank"
+                                        rel="noopener">distance de Manhattan </a> d’au moins 3
                                 </div>
                             </li>
                         </ul>
@@ -399,11 +418,17 @@
 
                     <div class="col-12 col-lg-2 col-actions text-lg-end">
                         <label class="form-label is-header invisible d-none d-sm-block">Actions</label>
-                        <button class="btn btn-sm btn-primary mt-sm-2" type="button" id="btnAddConstraint">Ajouter
-                            contrainte
-                        </button>
-                        <button id="btnClearConstraints" class="btn btn-outline-danger">vider les contraintes</button>
+
+                        <div class="actions-wrap d-flex flex-wrap gap-2 mt-sm-2 justify-content-lg-end">
+                            <button class="btn btn-sm btn-primary" type="button" id="btnAddConstraint">
+                                Ajouter contrainte
+                            </button>
+                            <button id="btnClearConstraints" class="btn btn-outline-danger" type="button">
+                                vider les contraintes
+                            </button>
+                        </div>
                     </div>
+
                 </div>
 
                 <div class="d-flex align-items-center gap-4 my-2 flex-wrap">
