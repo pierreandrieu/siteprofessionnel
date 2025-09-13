@@ -11,8 +11,8 @@
  *    ou des classes CSS définies dans un fichier .css séparé.
  */
 
-import {state} from "./state.js";
-import {$, buildDisplayMaps, compareByLastThenFirst, norm} from "./utils.js";
+import {state} from "plandeclasse/state";
+import {$, buildDisplayMaps, compareByLastThenFirst, norm} from "plandeclasse/utils";
 
 /* ==========================================================================
    Dimensions & compaction

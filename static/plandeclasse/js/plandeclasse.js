@@ -8,15 +8,15 @@
  *
  */
 
-import {state as etat} from "./state.js";
-import {$} from "./utils.js";
+import {state as etat} from "plandeclasse/state";
+import {$} from "plandeclasse/utils";
 
 // Rendus & UI
 import {
     renderRoom as rendreSalle,
     renderStudents as rendreEleves,
     updateBanButtonLabel as majBoutonBan,
-} from "./render.js";
+} from "plandeclasse/render";
 
 // Contraintes
 import {
@@ -25,7 +25,7 @@ import {
     addConstraint as ajouterContrainte,
     cancelConstraintForm as annulerFormContrainte,
     renderConstraints as rendreContraintes,
-} from "./constraints.js";
+} from "plandeclasse/constraints";
 
 // Interactions (clics, bannissement, désaffectation)
 import {
@@ -33,7 +33,7 @@ import {
     resetPlanKeepRoom as reinitialiserPlanSeulement,
     toggleSelectedSeatBan as basculerSiegeInterdit,
     unassignSelected as desaffecterSelection,
-} from "./interactions.js";
+} from "plandeclasse/interactions";
 
 // Schéma de salle
 import {
@@ -41,23 +41,23 @@ import {
     reconcileAfterSchemaChange as recalerApresSchema,
     renderRowsEditor as rendreEditeurRangees,
     resetRoomSchema as reinitialiserSchemaSalle,
-} from "./schema.js";
+} from "plandeclasse/schema";
 
 // Export
 import {
     setupExportUI as preparerUIExport,
     startExport as demarrerExport,
-} from "./export.js";
+} from "plandeclasse/export";
 
 // Solveur
 import {
     setupSolveUI as preparerUISolveur,
     syncSolveButtonEnabled as syncBoutonSolve,
     startSolve as demarrerSolve,
-} from "./solver.js";
+} from "plandeclasse/solver";
 
 // Import CSV/JSON unifié
-import {setupUnifiedImport as preparerImportUnifie} from "./importers.js";
+import {setupUnifiedImport as preparerImportUnifie} from "plandeclasse/importers";
 
 /**
  * Réinitialise le plan de classe SANS toucher au schéma de salle.

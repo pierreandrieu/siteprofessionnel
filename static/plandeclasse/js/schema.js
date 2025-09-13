@@ -9,13 +9,13 @@
  *  - Pas de style inline et pas d’HTML injecté via innerHTML pour les éléments dynamiques.
  */
 
-import {state as etat} from "./state.js";
+import {state as etat} from "plandeclasse/state";
 import {
     renderRoom as rendreSalle,
     renderStudents as rendreEleves,
     updateBanButtonLabel as majBoutonBan
-} from "./render.js";
-import {renderConstraints as rendreContraintes} from "./constraints.js";
+} from "plandeclasse/render";
+import {renderConstraints as rendreContraintes} from "plandeclasse/constraints";
 
 /* ==========================================================================
    Recalage après changement de schéma

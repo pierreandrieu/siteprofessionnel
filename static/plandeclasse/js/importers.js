@@ -14,14 +14,14 @@
  *  - Les données utilisateurs sont traitées de manière défensive (trim/normalisation).
  */
 
-import {state} from "./state.js";
-import {$, splitName} from "./utils.js";
-import {parseCSV} from "./csv.js";
-import {renderRoom, renderStudents, updateBanButtonLabel} from "./render.js";
-import {renderConstraints, refreshConstraintSelectors} from "./constraints.js";
-import {syncSolveButtonEnabled} from "./solver.js";
-import {syncExportButtonEnabled} from "./export.js";
-import {renderRowsEditor, reconcileAfterSchemaChange} from "./schema.js";
+import {state} from "plandeclasse/state";
+import {$, splitName} from "plandeclasse/utils";
+import {parseCSV} from "plandeclasse/csv";
+import {renderRoom, renderStudents, updateBanButtonLabel} from "plandeclasse/render";
+import {renderConstraints, refreshConstraintSelectors} from "plandeclasse/constraints";
+import {syncSolveButtonEnabled} from "plandeclasse/solver";
+import {syncExportButtonEnabled} from "plandeclasse/export";
+import {renderRowsEditor, reconcileAfterSchemaChange} from "plandeclasse/schema";
 
 /* ==========================================================================
    Réinitialisation propre de l’état

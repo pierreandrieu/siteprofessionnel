@@ -10,8 +10,8 @@
  *  - On convertit toute taille de police inline en attribut `font-size`.
  */
 
-import {state} from "./state.js";
-import {$} from "./utils.js";
+import {state} from "plandeclasse/state";
+import {$} from "plandeclasse/utils";
 
 /* ==========================================================================
    Outils SVG (CSP-friendly)

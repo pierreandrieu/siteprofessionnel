@@ -443,9 +443,15 @@
 {% endblock %}
 
 
-
 {% block extra_js %}
-    <script type="importmap" nonce="{{ request.csp_nonce }}">{{ importmap_json|safe }}</script>
-    <script type="module" src="{% static 'plandeclasse/js/plandeclasse.js' %}"></script>
+    <script type="importmap" nonce="{{ request.csp_nonce }}">
+    {{ importmap_json|safe }}
+
+    </script>
+
+    <script type="module" nonce="{{ request.csp_nonce }}">
+        import "plandeclasse/index";
+    </script>
+
     <script src="{% static 'plandeclasse/js/ui-steps.js' %}" defer></script>
 {% endblock %}

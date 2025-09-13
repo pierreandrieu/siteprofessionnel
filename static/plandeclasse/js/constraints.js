@@ -18,9 +18,9 @@
  *   et leur suppression met aussi à jour state.forbidden.
  */
 
-import {state} from "./state.js";
-import {$, compareByLastThenFirst, computeMaxManhattan} from "./utils.js";
-import {renderRoom, renderStudents, updateBanButtonLabel} from "./render.js";
+import {state} from "plandeclasse/state";
+import {$, compareByLastThenFirst, computeMaxManhattan} from "plandeclasse/utils";
+import {renderRoom, renderStudents, updateBanButtonLabel} from "plandeclasse/render";
 
 /* ==========================================================================
    Helpers internes

@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "plandeclasse/*": [
+        "static/plandeclasse/js/*"
+      ]
+    }
+  },
+  "exclude": [
+    "**/venv/**",
+    "**/node_modules/**"
+  ]
+}

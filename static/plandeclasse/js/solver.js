@@ -12,12 +12,12 @@
  * Sécurité/CSP : pas d’HTML injecté, pas de style inline.
  */
 
-import {state as etat} from "./state.js";
+import {state as etat} from "plandeclasse/state";
 import {
     renderRoom as rendreSalle,
     renderStudents as rendreEleves,
     updateBanButtonLabel as majBoutonBan
-} from "./render.js";
+} from "plandeclasse/render";
 
 /* ==========================================================================
    Préconditions (btn "générer")
