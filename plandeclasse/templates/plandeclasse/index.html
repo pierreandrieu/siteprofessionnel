@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
+{% load csp %}
 
 {% block title %}Plan de classe{% endblock %}
 
@@ -10,7 +11,7 @@
 {% block content %}
     <div id="pc-root" class="container-fluid py-3">
         <h1 class="h4 mb-3">Outil de génération de plan de classe sous contraintes</h1>
-
+        <!-- NONCE={{ csp_nonce }} -->
         <!-- ===== Étape 1 ===== -->
         <div class="bg-light border rounded px-3 py-2 my-3 d-flex align-items-center">
             <span class="badge text-bg-primary me-2">Étape 1</span>
@@ -455,3 +456,5 @@
 
     <script src="{% static 'plandeclasse/js/ui-steps.js' %}" defer></script>
 {% endblock %}
+
+

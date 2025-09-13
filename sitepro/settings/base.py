@@ -27,32 +27,30 @@ INSTALLED_APPS = [
     "plandeclasse",
     "csp"
 ]
-CSP_INCLUDE_NONCE_IN = ("script-src",)
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
+    "csp.middleware.CSPMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "csp.middleware.CSPMiddleware",
 ]
 
 CONTENT_SECURITY_POLICY = {
     "DIRECTIVES": {
-        "default-src": ["'self'"],
-        "script-src": ["'self'", NONCE],
-        "style-src": ["'self'"],
-        "img-src": ["'self'", "data:"],
-        "frame-ancestors": ["'self'"],
-        "font-src": ["'self'"],
-        "connect-src": ["'self'"],  # fetch/WebSocket/API
-        "object-src": ["'none'"],  # pas d’<object>/<embed>
-        "base-uri": ["'self'"],
-
+        "default-src": ("'self'",),
+        "script-src": ("'self'", NONCE),
+        "style-src": ("'self'",),
+        "img-src": ("'self'", "data:"),
+        "font-src": ("'self'", "data:"),
+        "connect-src": ("'self'",),
+        "object-src": ("'none'",),
+        "frame-ancestors": ("'self'",),
+        "base-uri": ("'self'",),
     }
 }
 
@@ -93,10 +91,9 @@ TEMPLATES[0]["OPTIONS"]["context_processors"] += [
     "sitepro.context_processors.importmap_json",
 ]
 
-# TEMPLATES[0]["OPTIONS"]["context_processors"] += [
-#    "sitepro.context_processors.csp_nonce",
-#    "sitepro.context_processors.importmap_json",
-# ]
+TEMPLATES[0]["OPTIONS"]["context_processors"] += [
+    "csp.context_processors.nonce",
+]
 
 WSGI_APPLICATION = "sitepro.wsgi.application"
 
@@ -124,7 +121,6 @@ USE_TZ = True
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # LOGS
-# comments in English
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,

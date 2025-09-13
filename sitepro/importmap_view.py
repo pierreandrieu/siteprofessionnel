@@ -1,7 +1,6 @@
 import json
 from django.templatetags.static import static
-
-from cours.views import current_school_year
+from django.http import HttpResponse
 
 MODULES = {
     "plandeclasse/index": "plandeclasse/js/plandeclasse.js",
@@ -18,11 +17,9 @@ MODULES = {
 }
 
 
-def school_year(request):
-    return {"cur_year": current_school_year()}
-
-
-def importmap_json(_request):
-    imports = {k: static(v) for k, v in MODULES.items()}  # renvoie les chemins fingerprintés après collectstatic
-    data = {"imports": imports}
-    return {"importmap_json": json.dumps(data, separators=(",", ":"))}
+def importmap_view(_request):
+    data = {"imports": {k: static(v) for k, v in MODULES.items()}}
+    resp = HttpResponse(json.dumps(data, separators=(",", ":")),
+                        content_type="application/importmap+json")
+    resp["Cache-Control"] = "no-store"  # en dev: toujours frais
+    return resp

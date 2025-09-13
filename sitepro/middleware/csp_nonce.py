@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# sitepro/middleware/csp_nonce.py
 import secrets
 
 
@@ -7,21 +7,21 @@ class CSPNonceMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        request.csp_nonce = secrets.token_urlsafe(16)
+        nonce = secrets.token_urlsafe(16)
+        request.csp_nonce = nonce
 
-        response = self.get_response(request)
+        resp = self.get_response(request)
 
-        nonce = request.csp_nonce
-        csp = (
+        # Politique compacte avec nonce appliqué
+        policy = (
             "default-src 'self'; "
             f"script-src 'self' 'nonce-{nonce}'; "
             "style-src 'self'; "
             "img-src 'self' data:; "
             "font-src 'self' data:; "
             "connect-src 'self'; "
-            "frame-ancestors 'none'; "
-            "base-uri 'self'; "
-            "form-action 'self'"
+            "frame-ancestors 'self'; "
+            "base-uri 'self'"
         )
-        response["Content-Security-Policy"] = csp
-        return response
+        resp["Content-Security-Policy"] = policy
+        return resp
