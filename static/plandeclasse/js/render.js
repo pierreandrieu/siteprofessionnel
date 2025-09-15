@@ -138,10 +138,13 @@ function appendSeatLabelFitted(svg, cx, cy, seatW, seatH, texte, seatKey) {
     svg.appendChild(textEl);
 
     // Crée les tspans immédiatement pour que les mesures fonctionnent
+
     const tspans = lignes.map((l) => {
         const t = document.createElementNS(ns, "tspan");
         t.setAttribute("x", String(cx));
         t.textContent = l;
+        // 👇 ajoute cette ligne pour que le clic sur <tspan> soit nativement reconnu
+        t.setAttribute("data-seat", seatKey);
         textEl.appendChild(t);
         return t;
     });

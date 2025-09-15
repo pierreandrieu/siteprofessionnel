@@ -260,10 +260,20 @@ export function seatClick(seatKey) {
  * @param {MouseEvent} ev
  */
 export function onCanvasClick(ev) {
-    const target = ev.target;
-    if (!(target instanceof SVGElement)) return;
-    const seatKey = target.getAttribute("data-seat");
-    if (seatKey) seatClick(seatKey);
+    let el = /** @type {EventTarget|null} */ (ev.target);
+
+    while (el && el !== ev.currentTarget) {
+        if (el instanceof SVGElement) {
+            const seatKey = el.getAttribute("data-seat");
+            if (seatKey) {
+                seatClick(seatKey);
+                ev.preventDefault();
+                return;
+            }
+        }
+        // @ts-ignore: parentNode existe sur les nœuds SVG
+        el = el.parentNode;
+    }
 }
 
 /* ==========================================================================
