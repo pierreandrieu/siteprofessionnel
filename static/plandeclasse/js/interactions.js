@@ -18,9 +18,9 @@
  *  CSP-friendly : aucun style inline, aucun HTML injecté ici.
  */
 
-import {state} from "./state.js";
-import {renderRoom, renderStudents, updateBanButtonLabel} from "./render.js";
-import {renderConstraints} from "./constraints.js";
+import {state} from "plandeclasse/state";
+import {renderRoom, renderStudents, updateBanButtonLabel} from "plandeclasse/render";
+import {renderConstraints} from "plandeclasse/constraints";
 
 /* ==========================================================================
    Aides locales (rafraîchis l'UI après mutation d'état)
