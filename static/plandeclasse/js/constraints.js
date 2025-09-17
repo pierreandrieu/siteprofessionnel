@@ -115,6 +115,38 @@ function humanizeConstraint(c /**: any */) /**: string */ {
     }
 }
 
+/** Bascule libellés des boutons selon ajout/édition. */
+function setConstraintButtonsEditing(editing) {
+    const btnAdd = /** @type {HTMLButtonElement|null} */ (document.getElementById("btnAddConstraint"));
+    const btnCancel = /** @type {HTMLButtonElement|null} */ (document.getElementById("btnCancelConstraint"));
+    if (btnAdd) btnAdd.textContent = editing ? "Enregistrer les modifications" : "Ajouter";
+    if (btnCancel) btnCancel.textContent = editing ? "Annuler l’édition" : "Réinitialiser";
+}
+
+/** Coche/selectionne programmatique des élèves dans les deux UIs (desktop+mobile). */
+function applyIdsToSelectors(ids /**: number[] */) {
+    const set = new Set(ids.map(Number));
+
+    const sel = /** @type {HTMLSelectElement|null} */ (document.getElementById("cstStudents"));
+    if (sel) {
+        Array.from(sel.options).forEach(opt => {
+            opt.selected = set.has(Number(opt.value));
+        });
+    }
+    const mob = /** @type {HTMLElement|null} */ (document.getElementById("cstStudentsMobile"));
+    if (mob) {
+        mob.querySelectorAll('input[type="checkbox"]').forEach((i) => {
+            /** @type {HTMLInputElement} */ (i).checked = set.has(Number(i.value));
+        });
+    }
+}
+
+/** Devine si un type est unaire/binaire. */
+function isUnaryType(t /**: string */) {
+    return ["front_rows", "back_rows", "solo_table", "empty_neighbor", "no_adjacent"].includes(t);
+}
+
+
 /* ==========================================================================
    Sélecteurs d’élèves (desktop + mobile)
    ========================================================================== */
@@ -233,6 +265,11 @@ export function cancelConstraintForm() {
             /** @type {HTMLInputElement} */ (i).checked = false;
         });
     }
+    // Si on était en mode édition de lot, on sort de l'édition
+    if (state.uiDraft.editingBatchId) {
+        state.uiDraft.editingBatchId = null;
+        setConstraintButtonsEditing(false);
+    }
 
     const typeSel = /** @type {HTMLSelectElement|null} */ (document.getElementById("constraintType"));
     if (typeSel) typeSel.selectedIndex = 0;
@@ -334,29 +371,64 @@ export function addConstraint() {
    ========================================================================== */
 
 /**
- * Affiche :
- *  - les lots (marqueurs _batch_marker_) avec un bouton ✕ qui supprime tout le lot,
- *  - les contraintes individuelles sans batch_id (ex. forbid_seat) avec ✕ dédié.
- * Met aussi à jour l’UI (room, students, boutons) quand on supprime.
+ * Affiche les contraintes dans l’UI.
+ *
+ * Deux catégories sont rendues :
+ *  1) Les « lots » (marqueurs `_batch_marker_`) :
+ *     - Affichés comme des pills avec le texte humain (m.human).
+ *     - Bouton ✎ pour éditer le lot (pré-remplit le formulaire).
+ *     - Bouton ✕ pour supprimer TOUT le lot (les entrées + le marqueur).
+ *       → Si on supprimait le lot actuellement édité, on sort proprement du mode édition
+ *         (reset des boutons, du formulaire, et vidage de editingBatchId).
+ *
+ *  2) Les contraintes individuelles SANS batch_id (ex : `forbid_seat`, `exact_seat`, legacy) :
+ *     - Affichées comme des pills individuelles.
+ *     - Bouton ✕ qui retire la contrainte, avec effets de bord nécessaires :
+ *          • `forbid_seat` : met à jour `state.forbidden`.
+ *          • `exact_seat`  : désaffecte l’élève si besoin.
+ *
+ * Cette fonction se contente du rendu + wiring des boutons.
+ * Elle délègue la logique d’édition à `startEditBatch()` et la logique de reset
+ * du formulaire à `cancelConstraintForm()`. Après toute mutation, elle rafraîchit
+ * les vues nécessaires (room, students, badges de boutons).
  */
 export function renderConstraints() {
     const root = /** @type {HTMLElement|null} */ ($("#constraintsList"));
     if (!root) return;
+
+    // Vide le conteneur avant de re-render.
     root.innerHTML = "";
 
-    // --- 1) Lots (marqueurs) ---
+    /* -----------------------------------------------------------------------
+     * 1) Lots (marqueurs _batch_marker_)
+     * --------------------------------------------------------------------- */
     const markers = state.constraints.filter((c) => c.type === "_batch_marker_");
+
     for (const m of markers) {
+        // Conteneur visuel du lot
         const item = document.createElement("div");
         item.className = "constraint-pill me-2 mb-2 d-inline-flex align-items-center gap-2";
         item.setAttribute("role", "group");
         item.setAttribute("aria-label", "Lot de contraintes");
         item.dataset.batchId = m.batch_id;
 
+        // Texte humain du lot (ex: "Alice et Bob doivent ...")
         const text = document.createElement("span");
         text.textContent = m.human || "(lot)";
         item.appendChild(text);
 
+        // Bouton ÉDITER (✎) → ouvre le formulaire pré-rempli (type, param, élèves)
+        const edit = document.createElement("button");
+        edit.className = "btn btn-sm btn-outline-secondary";
+        edit.type = "button";
+        edit.setAttribute("aria-label", "Éditer ce lot de contraintes");
+        edit.textContent = "✎";
+        edit.addEventListener("click", () => {
+            startEditBatch(m.batch_id);
+        });
+        item.appendChild(edit);
+
+        // Bouton SUPPRIMER (✕) → retire toutes les contraintes du lot + le marqueur
         const del = document.createElement("button");
         del.className = "btn btn-sm btn-outline-danger";
         del.type = "button";
@@ -364,7 +436,18 @@ export function renderConstraints() {
         del.textContent = "✕";
         del.addEventListener("click", () => {
             const bid = m.batch_id;
+
+            // Si on supprimait le lot en cours d’édition → on sort proprement du mode édition
+            if (state.uiDraft.editingBatchId === bid) {
+                state.uiDraft.editingBatchId = null;
+                setConstraintButtonsEditing(false);
+                cancelConstraintForm(); // remet à zéro type/param/sel. d’élèves + focus
+            }
+
+            // Supprime ce lot : toutes les entrées avec ce batch_id + le marqueur m
             state.constraints = state.constraints.filter((c) => c.batch_id !== bid && c !== m);
+
+            // Rafraîchis l’UI (liste contraintes, étiquettes/boutons, SVG)
             renderConstraints();
             updateBanButtonLabel();
             renderRoom();
@@ -374,8 +457,10 @@ export function renderConstraints() {
         root.appendChild(item);
     }
 
-    // --- 2) Contraintes individuelles sans batch_id (legacy / forbid_seat / directes)
-    //         et on ignore les marqueurs UI-only (ex: _objective_)
+    /* -----------------------------------------------------------------------
+     * 2) Contraintes individuelles SANS batch_id
+     *    (legacy, forbid_seat, exact_seat, etc.) — on ignore les _objective_
+     * --------------------------------------------------------------------- */
     const singles = state.constraints.filter(
         (c) => c.type !== "_batch_marker_" && c.type !== "_objective_" && !c.batch_id
     );
@@ -386,23 +471,29 @@ export function renderConstraints() {
         item.setAttribute("role", "group");
         item.setAttribute("aria-label", "Contrainte");
 
+        // Texte lisible (« élève X doit … », etc.)
         const text = document.createElement("span");
         text.textContent = humanizeConstraint(c);
         item.appendChild(text);
 
+        // Bouton SUPPRIMER (✕) pour la contrainte individuelle
         const del = document.createElement("button");
         del.className = "btn btn-sm btn-outline-danger";
         del.type = "button";
         del.setAttribute("aria-label", "Supprimer cette contrainte");
         del.textContent = "✕";
         del.addEventListener("click", () => {
-            // Siège interdit : tenir à jour le Set state.forbidden
+            // 2.1) Effets de bord propres
             if (c.type === "forbid_seat") {
-                const k = c.key || (Number.isFinite(c.x) && Number.isFinite(c.y) && Number.isFinite(c.s) ? `${c.x},${c.y},${c.s}` : null);
+                // On retire aussi la clé de `state.forbidden`
+                const k =
+                    c.key ||
+                    (Number.isFinite(c.x) && Number.isFinite(c.y) && Number.isFinite(c.s) ? `${c.x},${c.y},${c.s}` : null);
                 if (k) state.forbidden.delete(k);
             }
-            // exact_seat : retirer aussi l'élève de sa place (spec : "virer la contrainte, ce qui vire l’élève")
+
             if (c.type === "exact_seat") {
+                // Éjecte l’élève si la contrainte le "pinnait" à un siège
                 const sid = Number(c.a);
                 const prev = state.placedByStudent.get(sid);
                 if (prev) {
@@ -411,10 +502,11 @@ export function renderConstraints() {
                 }
             }
 
-            // Retire la contrainte de l’array
+            // 2.2) Supprime la contrainte de l’array
             const idx = state.constraints.indexOf(c);
             if (idx >= 0) state.constraints.splice(idx, 1);
 
+            // 2.3) Rafraîchis l’UI
             renderConstraints();
             renderRoom();
             renderStudents();
@@ -425,3 +517,155 @@ export function renderConstraints() {
         root.appendChild(item);
     }
 }
+
+
+/**
+ * Lance l'édition d'un lot identifié par batch_id :
+ * - pré-remplit le formulaire (type, param, élèves),
+ * - bascule les boutons en mode "édition".
+ */
+export function startEditBatch(batch_id /**: string */) {
+    // Récupère toutes les entrées du lot (hors marqueur)
+    const items = state.constraints.filter(c => c.batch_id === batch_id && c.type !== "_batch_marker_");
+    if (!items.length) return;
+
+    // Type du lot = type de la première entrée
+    const t = items[0].type;
+    const typeSel = /** @type {HTMLSelectElement|null} */ (document.getElementById("constraintType"));
+    const pInput = /** @type {HTMLInputElement|null} */ (document.getElementById("cstParam"));
+    if (!typeSel || !pInput) return;
+
+    // Préselectionne le type et affiche le bon champ param.
+    typeSel.value = t;
+    onConstraintTypeChange();
+
+    // Paramètre (si applicable) : on prend la 1ère valeur rencontrée
+    if (t === "far_apart") {
+        const d = Number(items.find(c => "d" in c)?.d ?? 2) || 2;
+        const maxD = computeMaxManhattan(state.schema);
+        pInput.value = String(Math.min(Math.max(2, d), Math.max(2, maxD)));
+    } else if (t === "front_rows" || t === "back_rows") {
+        const k = Number(items.find(c => "k" in c)?.k ?? 1) || 1;
+        pInput.value = String(Math.max(1, k));
+    } else {
+        pInput.value = "";
+    }
+
+    // Élèves concernés
+    let ids = [];
+    if (isUnaryType(t)) {
+        ids = items.map(c => Number(c.a)).filter(Number.isFinite);
+    } else {
+        const set = new Set();
+        for (const c of items) {
+            if (Number.isFinite(c.a)) set.add(Number(c.a));
+            if (Number.isFinite(c.b)) set.add(Number(c.b));
+        }
+        ids = Array.from(set);
+    }
+
+    // Rafraîchit les sélecteurs puis applique la sélection
+    refreshConstraintSelectors();
+    applyIdsToSelectors(ids);
+
+    // Passe en mode édition
+    state.uiDraft.editingBatchId = batch_id;
+    setConstraintButtonsEditing(true);
+
+    // Focus UX
+    (document.getElementById("cstParam") || document.getElementById("cstStudents") || typeSel)?.focus();
+}
+
+/**
+ * Bouton principal du formulaire :
+ * - si on n'édite pas de lot → ajoute (comportement existant),
+ * - si un lot est en cours d'édition → met à jour ce lot.
+ */
+export function commitConstraintForm() {
+    const editing = state.uiDraft.editingBatchId;
+    if (!editing) {
+        addConstraint(); // comportement existant inchangé
+        return;
+    }
+
+    // ===== Mise à jour du lot existant =====
+    const typeSel = /** @type {HTMLSelectElement} */ (document.getElementById("constraintType"));
+    const t = typeSel.value;
+    const selectedIds = getSelectedStudentIds();
+
+    const isUnary = isUnaryType(t);
+    const isBinary = ["same_table", "far_apart"].includes(t);
+
+    if (isUnary && selectedIds.length === 0) {
+        alert("Sélectionnez au moins un élève pour cette contrainte.");
+        return;
+    }
+    if (isBinary && selectedIds.length < 2) {
+        alert("Sélectionnez au moins deux élèves pour cette contrainte.");
+        return;
+    }
+
+    const pInput = /** @type {HTMLInputElement|null} */ (document.getElementById("cstParam"));
+    const pValRaw = pInput?.value ? Number(pInput.value) : null;
+
+    const maxD = computeMaxManhattan(state.schema);
+    const d = t === "far_apart" ? Math.min(Math.max(2, pValRaw || 2), Math.max(2, maxD)) : null;
+    const k = (t === "front_rows" || t === "back_rows") ? Math.max(1, pValRaw ?? 1) : null;
+
+    // Texte humain du lot
+    const namesPlural = formatNamesList(selectedIds);
+    let batch_human = "";
+    switch (t) {
+        case "front_rows":
+            batch_human = `${namesPlural} doivent être dans les premières rangées (k=${k ?? "?"})`;
+            break;
+        case "back_rows":
+            batch_human = `${namesPlural} doivent être dans les dernières rangées (k=${k ?? "?"})`;
+            break;
+        case "solo_table":
+            batch_human = `${namesPlural} doivent être isolé·e·s sur une table`;
+            break;
+        case "empty_neighbor":
+            batch_human = `${namesPlural} doivent avoir au moins un siège vide à côté`;
+            break;
+        case "no_adjacent":
+            batch_human = `${namesPlural} ne doivent avoir aucun·e voisin·e adjacent·e`;
+            break;
+        case "same_table":
+            batch_human = `${namesPlural} doivent être à la même table`;
+            break;
+        case "far_apart":
+            batch_human = `${namesPlural} doivent être éloigné·e·s d’une distance d’au moins d=${d ?? "?"}`;
+            break;
+    }
+
+    /** @type {any[]} */
+    const payloads = [];
+    if (isUnary) {
+        for (const a of selectedIds) {
+            const c = /** @type {any} */ ({type: t, a, batch_id: editing, human: ""});
+            if (k != null) c.k = k;
+            payloads.push(c);
+        }
+    } else {
+        for (const [a, b] of pairs(selectedIds)) {
+            const c = /** @type {any} */ ({type: t, a, b, batch_id: editing, human: ""});
+            if (d != null) c.d = d;
+            payloads.push(c);
+        }
+    }
+
+    // 1) Purge l'ancien lot (contraintes + marqueur)
+    state.constraints = state.constraints.filter(c => c.batch_id !== editing);
+
+    // 2) Réinsère les contraintes + nouveau marqueur (même batch_id conservé)
+    for (const p of payloads) state.constraints.push(p);
+    state.constraints.push({type: "_batch_marker_", batch_id: editing, human: batch_human, count: payloads.length});
+
+    // 3) UI : reset mode édition + rerender
+    state.uiDraft.editingBatchId = null;
+    setConstraintButtonsEditing(false);
+    cancelConstraintForm(); // remet à zéro la sélection/param/UI
+    renderConstraints();
+}
+

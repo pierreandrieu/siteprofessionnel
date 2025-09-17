@@ -9,7 +9,7 @@
  */
 
 /* ==========================================================================
-   Typages JSDoc (purement informatifs, utiles à l’IDE)
+   Typages JSDoc (pueditingBatchId: null,rement informatifs, utiles à l’IDE)
    ========================================================================== */
 
 /** Clé canonique d’un siège (x,y,s) sous forme "x,y,s". */
@@ -149,6 +149,7 @@ export const state = {
     // brouillon de déplacement clavier (ghost)
     uiDraft: {
         nudge: null,
+        editingBatchId: null,
     },
 };
 

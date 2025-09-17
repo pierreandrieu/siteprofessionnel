@@ -22,7 +22,7 @@ import {
 import {
     refreshConstraintSelectors as rafraichirSelecteursContraintes,
     onConstraintTypeChange as surChangementTypeContrainte,
-    addConstraint as ajouterContrainte,
+    commitConstraintForm as validerFormContrainte,
     cancelConstraintForm as annulerFormContrainte,
     renderConstraints as rendreContraintes,
 } from "plandeclasse/constraints";
@@ -175,7 +175,7 @@ function initialiser() {
 
     // --- Formulaire de contraintes (type + ajout + reset)
     $("#constraintType")?.addEventListener("change", surChangementTypeContrainte);
-    $("#btnAddConstraint")?.addEventListener("click", ajouterContrainte);
+    $("#btnAddConstraint")?.addEventListener("click", validerFormContrainte);
     document.getElementById("btnCancelConstraint")?.addEventListener("click", annulerFormContrainte);
 
     // Verrouillage des placements (option)
