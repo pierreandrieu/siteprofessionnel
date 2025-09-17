@@ -180,6 +180,7 @@ class ExportInput(TypedDict, total=False):
     forbidden: list[str]
     placements: dict[str, int]
     name_view: str
+    table_offsets: Dict[str, Dict[str, int]]
 
 
 class ExportArtifacts(TypedDict, total=False):
@@ -252,6 +253,7 @@ def _build_export_json(data: ExportInput, class_name: str) -> bytes:
         "constraints": data.get("constraints", []),
         "forbidden": data.get("forbidden", []),
         "placements": data.get("placements", {}),
+        "table_offsets": data.get("table_offsets", {}),
     }
     return json.dumps(export_obj, ensure_ascii=False, indent=2).encode("utf-8")
 
