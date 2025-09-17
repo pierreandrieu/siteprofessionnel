@@ -131,6 +131,7 @@ function collectRoomSvgMarkupStudent() {
 
     const clone = cloneCanvasSvg(svgEl);
     addWhiteBackground(clone);
+    pruneUiArtifacts(clone);
     applyPresentationAttributes(clone); // <- pas de <style>, pas de style=
 
     return serializeSvg(clone);
@@ -146,6 +147,7 @@ function collectRoomSvgMarkupTeacher() {
 
     const clone = cloneCanvasSvg(svgEl);
     addWhiteBackground(clone);
+    pruneUiArtifacts(clone);
 
     const W = Number(clone.getAttribute("width") || "0");
     const H = Number(clone.getAttribute("height") || "0");
@@ -198,14 +200,22 @@ function collectRoomSvgMarkupTeacher() {
    Construction du payload
    ========================================================================== */
 
+/**
+ * Construit le payload complet de l’export.
+ * Réécrit pour inclure `table_offsets`.
+ */
 export function buildExportPayload() {
     const classInput = /** @type {HTMLInputElement|null} */ ($("#className"));
     const class_name = (classInput?.value || "").trim();
 
+    const table_offsets = Object.fromEntries(
+        Array.from(state.tableOffsets.entries()).map(([k, v]) => [k, {dx: Number(v.dx) || 0, dy: Number(v.dy) || 0}])
+    );
+
     return {
         class_name,
-        svg_markup_student: collectRoomSvgMarkupStudent(),
-        svg_markup_teacher: collectRoomSvgMarkupTeacher(),
+        svg_markup_student: null,     // rempli par startExport() si besoin
+        svg_markup_teacher: null,     // rempli par startExport() si besoin
         schema: state.schema,
         students: state.students.map((s) => ({
             id: s.id, name: s.name, first: s.first, last: s.last, gender: s.gender ?? null,
@@ -215,6 +225,7 @@ export function buildExportPayload() {
         forbidden: Array.from(state.forbidden),
         placements: Object.fromEntries(state.placements),
         name_view: state.nameView,
+        table_offsets,                // NEW
     };
 }
 
@@ -249,14 +260,18 @@ export async function startExport() {
     }
     classInput?.classList.remove("is-invalid");
 
-    const svgTxt = collectRoomSvgMarkupStudent();
-    if (!svgTxt) {
+    const svgStudent = collectRoomSvgMarkupStudent();
+    if (!svgStudent) {
         alert("Aucun plan de classe à exporter pour le moment.");
         return;
     }
+    const svgTeacher = collectRoomSvgMarkupTeacher();
 
-    const body = JSON.stringify({...buildExportPayload(), class_name: className});
-
+    const body = JSON.stringify({... buildExportPayload(),
+        class_name: className,
+        svg_markup_student: svgStudent,
+        svg_markup_teacher: svgTeacher,
+        });
     const prev = btn?.textContent || "";
     if (btn) {
         btn.disabled = true;
@@ -413,12 +428,14 @@ export function setupExportUI() {
     syncExportButtonEnabled();
 }
 
-/* ==========================================================================
-   Auto-init
-   ========================================================================== */
-
-if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => setupExportUI());
-} else {
-    setupExportUI();
+/** Supprime les artefacts purement UI du SVG exporté. */
+function pruneUiArtifacts(svg) {
+        // 1) éléments dédiés UI
+    svg.querySelectorAll(".table-ghost, .table-handle").forEach(el => el.remove());
+        // 2) classes de sélection : on les enlève pour l’export
+    svg.querySelectorAll(".seat-selected, .table-selected").forEach(el => {
+        const cls = (el.getAttribute("class") || "").split(/\s+/).filter(c => c && c !== "seat-selected" && c !== "table-selected");
+        if (cls.length) el.setAttribute("class", cls.join(" "));
+        else el.removeAttribute("class");
+    });
 }

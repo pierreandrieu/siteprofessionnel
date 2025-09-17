@@ -311,3 +311,22 @@
         min-height: 1.5rem;
     }
 }
+
+/* sélection d'une table (halo discret) */
+.table-selected {
+    stroke: #0b57d0;
+    stroke-width: 2;
+}
+
+/* fantôme lors du déplacement */
+.table-ghost {
+    fill: none;
+    stroke: #6b7280; /* gris neutre */
+    stroke-dasharray: 6 4; /* pointillés */
+    stroke-width: 2;
+}
+
+/* fantôme invalide (chevauchement) */
+.table-ghost-invalid {
+    stroke: #ef4444; /* rouge */
+}

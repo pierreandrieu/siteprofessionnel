@@ -118,33 +118,38 @@ export function updateBanButtonLabel() {
  * @param {string} texte - "Prénom", "NOM" ou "Prénom\nNOM"
  * @param {string} seatKey - clé du siège (pour data-seat)
  */
-function appendSeatLabelFitted(svg, cx, cy, seatW, seatH, texte, seatKey) {
-    // Paramètres d’ajustement
+
+/**
+ * Ajoute un label <text>/<tspan> centré et ajusté dans un siège.
+ * (identique au tien, conservé – sans style inline)
+ */
+/**
+ * Ajoute un label <text>/<tspan> centré et ajusté dans un siège.
+ * CSP-friendly : pas d'attribut style ; on utilise font-size et pointer-events.
+ */
+function appendSeatLabelFitted(parent, cx, cy, seatW, seatH, texte, seatKey) {
     const paddingX = Math.round(8 * UI_SCALE);
     const paddingY = Math.round(6 * UI_SCALE);
     const interligne = 1.12;
     const policeMin = Math.max(8, Math.round(8 * UI_SCALE));
-    const policeDepart = Math.floor(
-        Math.min(22 * UI_SCALE, seatW * 0.28, seatH * 0.70)
-    );
+    const policeDepart = Math.floor(Math.min(22 * UI_SCALE, seatW * 0.28, seatH * 0.70));
 
-    const lignes = String(texte || "").split("\n").slice(0, 2); // max 2 lignes
+    const lignes = String(texte || "").split("\n").slice(0, 2);
     const ns = "http://www.w3.org/2000/svg";
 
     const textEl = document.createElementNS(ns, "text");
     textEl.setAttribute("text-anchor", "middle");
     textEl.setAttribute("class", "seat-name");
-    textEl.setAttribute("data-seat", seatKey);
-    svg.appendChild(textEl);
+    // Laisse passer le clic vers le <rect data-seat> en dessous
+    textEl.setAttribute("pointer-events", "none");
 
-    // Crée les tspans immédiatement pour que les mesures fonctionnent
+    parent.appendChild(textEl);
 
     const tspans = lignes.map((l) => {
         const t = document.createElementNS(ns, "tspan");
         t.setAttribute("x", String(cx));
+        t.setAttribute("pointer-events", "none"); // sécurité : pas d'interception par <tspan>
         t.textContent = l;
-        // 👇 ajoute cette ligne pour que le clic sur <tspan> soit nativement reconnu
-        t.setAttribute("data-seat", seatKey);
         textEl.appendChild(t);
         return t;
     });
@@ -152,7 +157,6 @@ function appendSeatLabelFitted(svg, cx, cy, seatW, seatH, texte, seatKey) {
     const largeurMax = seatW - paddingX * 2;
     const hauteurMax = seatH - paddingY * 2;
 
-    // Positionne verticalement selon la taille de police courante
     function positionnerSelonTaille(taille) {
         const lh = taille * interligne;
         if (tspans.length === 1) {
@@ -161,7 +165,7 @@ function appendSeatLabelFitted(svg, cx, cy, seatW, seatH, texte, seatKey) {
             tspans[0].setAttribute("dy", "0");
         } else {
             const totalH = lh * tspans.length;
-            const yTop = cy - totalH / 2 + taille * 0.8; // centrage optique
+            const yTop = cy - totalH / 2 + taille * 0.8;
             textEl.setAttribute("y", String(yTop));
             tspans.forEach((ts, i) => {
                 ts.setAttribute("x", String(cx));
@@ -170,40 +174,32 @@ function appendSeatLabelFitted(svg, cx, cy, seatW, seatH, texte, seatKey) {
         }
     }
 
-    // Teste si toutes les lignes tiennent en largeur
     function tientEnLargeur() {
         return tspans.every((ts) => ts.getComputedTextLength() <= largeurMax);
     }
 
-    // Réduction progressive de la police (sans style inline)
     let taille = policeDepart;
     while (taille >= policeMin) {
         textEl.setAttribute("font-size", String(taille));
         positionnerSelonTaille(taille);
-
         const lh = taille * interligne;
         const totalH = lh * tspans.length;
         const okH = totalH <= hauteurMax;
         const okW = tientEnLargeur();
-
         if (okH && okW) break;
         taille -= 1;
     }
 
-    // Dernier recours : ellipse PAR LIGNE si ça dépasse encore
     if (!tientEnLargeur()) {
         const ellipsiser = (ts) => {
             const original = ts.textContent || "";
             const chars = Array.from(original);
-
-            // 1) coupe mot à mot
             let cut = original;
             while (ts.getComputedTextLength() > largeurMax && /\s/.test(cut)) {
-                cut = cut.replace(/\s+\S+$/u, ""); // retire le dernier mot
+                cut = cut.replace(/\s+\S+$/u, "");
                 ts.textContent = cut + "…";
                 if (cut.length <= 1) break;
             }
-            // 2) coupe caractère à caractère
             if (ts.getComputedTextLength() > largeurMax) {
                 let n = chars.length - 1;
                 while (n > 3) {
@@ -214,7 +210,6 @@ function appendSeatLabelFitted(svg, cx, cy, seatW, seatH, texte, seatKey) {
             }
         };
         tspans.forEach(ellipsiser);
-        // re-centre verticalement (hauteur modifiée)
         positionnerSelonTaille(taille);
     }
 }
@@ -227,12 +222,26 @@ function appendSeatLabelFitted(svg, cx, cy, seatW, seatH, texte, seatKey) {
  * Rendu du SVG de la salle (tables, sièges, bordures, croisillons, labels).
  * Respecte la CSP (pas d’attribut "style" posé).
  */
+/**
+ * Rendu du SVG de la salle (tables, sièges, labels).
+ * CSP-friendly : pas de style inline.
+ * Gère les offsets persistants + le “draft” (fantôme) d’une table en déplacement clavier.
+ * Ajoute data-table="x,y" sur chaque groupe pour la sélection d’une table.
+ */
+/**
+ * Rendu du SVG de la salle (tables, sièges, labels).
+ * CSP-friendly : pas de style inline.
+ * Gère les offsets persistants + le “draft” (fantôme) d’une table en déplacement clavier.
+ * Ajoute data-table="x,y" sur chaque groupe pour la sélection d’une table.
+ */
 export function renderRoom() {
     const svg = /** @type {SVGSVGElement|null} */ ($("#roomCanvas"));
     if (!svg) return;
     svg.innerHTML = "";
 
     const nbRangees = state.schema.length;
+    const {padX, padY, seatW, tableH, seatGap, colGap, rowGap, boardH} = computeDims(state.schema);
+
     if (nbRangees === 0) {
         svg.setAttribute("viewBox", `0 0 ${Math.round(600 * UI_SCALE)} ${Math.round(200 * UI_SCALE)}`);
         svg.setAttribute("width", String(Math.round(600 * UI_SCALE)));
@@ -240,219 +249,223 @@ export function renderRoom() {
         return;
     }
 
-    // Dimensions (compactes) calculées selon le schéma
-    const {padX, padY, seatW, tableH, seatGap, colGap, rowGap, boardH} =
-        computeDims(state.schema);
-
     // Largeurs de rangée (centrage)
-    const largeursRangee = state.schema.map((caps) => {
-        const tablesW = caps.reduce((somme, cap) => {
-            const c = Math.abs(cap); // compte aussi la largeur des trous
-            return somme + c * seatW + (c - 1) * seatGap;
+    const rowWidths = state.schema.map((caps) => {
+        const tablesW = caps.reduce((sum, cap) => {
+            const c = Math.abs(cap);
+            return sum + c * seatW + (c - 1) * seatGap;
         }, 0);
-        const entre = (caps.length - 1) * colGap;
-        return tablesW + entre;
+        return tablesW + (caps.length - 1) * colGap;
     });
-    const largeurMaxRangee = Math.max(...largeursRangee);
-    const largeurTableau = Math.max(largeurMaxRangee, 600 * UI_SCALE);
+    const maxRowW = Math.max(...rowWidths);
+    const boardW = Math.max(maxRowW, 600 * UI_SCALE);
+    const xBoard = padX + (maxRowW - boardW) / 2;
+    const yBoard = padY;
 
-    const xTableau = padX + (largeurMaxRangee - largeurTableau) / 2;
-    const yTableau = padY;
-
-    // Origines Y des rangées
-    const originesY = [];
-    let yCourant = yTableau + boardH + Math.round(10 * UI_SCALE);
+    // Origines Y
+    const originsY = [];
+    let yCur = yBoard + boardH + Math.round(10 * UI_SCALE);
     for (let y = 0; y < nbRangees; y++) {
-        originesY.push(yCourant);
-        yCourant += tableH + rowGap;
+        originsY.push(yCur);
+        yCur += tableH + rowGap;
     }
 
-    const largeurTotale = padX * 2 + largeurMaxRangee;
-    const hauteurTotale = (originesY.at(-1) || padY + 32) + tableH + padY;
+    const totalW = padX * 2 + maxRowW;
+    const totalH = (originsY.at(-1) || padY + 32) + tableH + padY;
 
-    // Vue + dimensions (sans style inline)
-    svg.setAttribute("viewBox", `0 0 ${largeurTotale} ${hauteurTotale}`);
-    // Si tu souhaites fixer une taille “min” côté JS, préfère les attributs :
-    svg.setAttribute("width", String(largeurTotale));
-    svg.setAttribute("height", String(Math.min(800, hauteurTotale)));
+    svg.setAttribute("viewBox", `0 0 ${totalW} ${totalH}`);
+    svg.setAttribute("width", String(totalW));
+    svg.setAttribute("height", String(Math.min(800, totalH)));
 
     const ns = "http://www.w3.org/2000/svg";
 
-    // motif hatch pour sièges interdits
-// motif hatch pour sièges interdits (scalé)
+    // defs pour le pattern “forbid”
     const defs = document.createElementNS(ns, "defs");
     const pattern = document.createElementNS(ns, "pattern");
     pattern.setAttribute("id", "forbidPattern");
     pattern.setAttribute("patternUnits", "userSpaceOnUse");
-
-// scale du pavé de pattern
     const patS = UI_SCALE;
     pattern.setAttribute("width", String(8 * patS));
     pattern.setAttribute("height", String(8 * patS));
-
     const pBg = document.createElementNS(ns, "rect");
     pBg.setAttribute("width", String(8 * patS));
     pBg.setAttribute("height", String(8 * patS));
     pBg.setAttribute("fill", "#f3f4f6");
     pattern.appendChild(pBg);
-
     const pLines = document.createElementNS(ns, "path");
-// on garde le même tracé de base…
     pLines.setAttribute("d", "M0,8 l8,-8 M-2,2 l4,-4 M6,10 l4,-4");
     pLines.setAttribute("stroke", "#cbd5e1");
     pLines.setAttribute("stroke-width", "1");
-// mais on le scale globalement pour suivre l'échelle UI
     pLines.setAttribute("transform", `scale(${patS})`);
     pattern.appendChild(pLines);
-
     defs.appendChild(pattern);
     svg.appendChild(defs);
 
-
     // Tableau
-    const rectTableau = document.createElementNS(ns, "rect");
-    rectTableau.setAttribute("x", String(xTableau));
-    rectTableau.setAttribute("y", String(yTableau));
-    rectTableau.setAttribute("width", String(largeurTableau));
-    rectTableau.setAttribute("height", String(boardH));
-    rectTableau.setAttribute("class", "board-rect");
-    svg.appendChild(rectTableau);
+    const rectBoard = document.createElementNS(ns, "rect");
+    rectBoard.setAttribute("x", String(xBoard));
+    rectBoard.setAttribute("y", String(yBoard));
+    rectBoard.setAttribute("width", String(boardW));
+    rectBoard.setAttribute("height", String(boardH));
+    rectBoard.setAttribute("class", "board-rect");
+    svg.appendChild(rectBoard);
 
-    const labelTableau = document.createElementNS(ns, "text");
-    labelTableau.setAttribute("x", String(xTableau + largeurTableau / 2));
-    labelTableau.setAttribute("y", String(yTableau + boardH / 2));
-    labelTableau.setAttribute("text-anchor", "middle");
-    labelTableau.setAttribute("dominant-baseline", "middle");
-    labelTableau.setAttribute("class", "board-label");
-    labelTableau.textContent = "TABLEAU";
-    svg.appendChild(labelTableau);
+    const labelBoard = document.createElementNS(ns, "text");
+    labelBoard.setAttribute("x", String(xBoard + boardW / 2));
+    labelBoard.setAttribute("y", String(yBoard + boardH / 2));
+    labelBoard.setAttribute("text-anchor", "middle");
+    labelBoard.setAttribute("dominant-baseline", "middle");
+    labelBoard.setAttribute("class", "board-label");
+    labelBoard.setAttribute("pointer-events", "none");
+    labelBoard.textContent = "TABLEAU";
+    svg.appendChild(labelBoard);
 
     const {firstMap, lastMap, bothMap} = buildDisplayMaps(state.students);
+
+    // Fantôme actif ?
+    const draft = state.uiDraft.nudge; // {tableKey, dx, dy, invalid} | null
+    const draftKey = draft?.tableKey || null;
 
     for (let y = 0; y < nbRangees; y++) {
         const caps = state.schema[y];
 
-        const tablesW = caps.reduce((somme, cap) => {
-            const c = Math.abs(cap); // pour bien centrer chaque rangée
-            return somme + c * seatW + (c - 1) * seatGap;
+        // largeur de la rangée (y)
+        const tablesW = caps.reduce((sum, cap) => {
+            const c = Math.abs(cap);
+            return sum + c * seatW + (c - 1) * seatGap;
         }, 0);
-        const entre = (caps.length - 1) * colGap;
-        const largeurRangee = tablesW + entre;
+        const rowW = tablesW + (caps.length - 1) * colGap;
 
-        let ox = padX + (largeurMaxRangee - largeurRangee) / 2;
-        const oy = originesY[y];
+        let ox = padX + (maxRowW - rowW) / 2; // origine X de la rangée centrée
+        const oy = originsY[y];
 
         for (let x = 0; x < caps.length; x++) {
             const cap = caps[x];
-            const largeurTable = cap * seatW + (cap - 1) * seatGap;
+            const absCap = Math.abs(cap);
+            const tableW = absCap * seatW + (absCap - 1) * seatGap;
 
             if (cap < 0) {
-                // "trou" : avance le curseur horizontal comme si on avait une table
-                const k = Math.abs(cap);
-                const largeurTrou = k * seatW + (k - 1) * seatGap;
-                ox += largeurTrou + colGap;
+                ox += tableW + colGap;
                 continue;
             }
 
-            // Table
+            // Offset persistant éventuellement présent
+            const tKey = `${x},${y}`;
+            const off = state.tableOffsets.get(tKey) || {dx: 0, dy: 0};
+
+            const isDrafted = draftKey === tKey;
+
+            // Groupe table (position persistante)
+            const g = document.createElementNS(ns, "g");
+            g.setAttribute("data-table", tKey);
+            g.setAttribute("transform", `translate(${ox + off.dx}, ${oy + off.dy})`);
+            svg.appendChild(g);
+
+            // Table (rect principal)
             const rectTable = document.createElementNS(ns, "rect");
-            rectTable.setAttribute("x", String(ox));
-            rectTable.setAttribute("y", String(oy));
-            rectTable.setAttribute("width", String(largeurTable));
+            rectTable.setAttribute("x", "0");
+            rectTable.setAttribute("y", "0");
+            rectTable.setAttribute("width", String(tableW));
             rectTable.setAttribute("height", String(tableH));
             rectTable.setAttribute("rx", String(Math.round(10 * UI_SCALE)));
-            rectTable.setAttribute("class", "table-rect");
-            svg.appendChild(rectTable);
+            rectTable.setAttribute(
+                "class",
+                "table-rect" + (state.selection.tableKey === tKey ? " table-selected" : "")
+            );
+            g.appendChild(rectTable);
 
+            // Si un ghost est actif pour cette table, on le dessine au-dessus
+            if (isDrafted) {
+                const ghost = document.createElementNS(ns, "rect");
+                ghost.setAttribute("x", String(draft.dx));
+                ghost.setAttribute("y", String(draft.dy));
+                ghost.setAttribute("width", String(tableW));
+                ghost.setAttribute("height", String(tableH));
+                ghost.setAttribute("rx", String(Math.round(10 * UI_SCALE)));
+                ghost.setAttribute("class", "table-ghost" + (draft.invalid ? " table-ghost-invalid" : ""));
+                g.appendChild(ghost);
+            }
+
+            // Sièges de la table
             for (let s = 0; s < cap; s++) {
-                const sx = ox + s * (seatW + seatGap);
-                const sy = oy;
+                const sx = s * (seatW + seatGap);
+                const sy = 0;
                 const seatKey = `${x},${y},${s}`;
-                const occupant = state.placements.get(seatKey) ?? null;
-                const estInterdit = state.forbidden.has(seatKey);
-                const estSelection = state.selection.seatKey === seatKey;
+                const occ = state.placements.get(seatKey) ?? null;
+                const isForbidden = state.forbidden.has(seatKey);
+                const isSelectedSeat = state.selection.seatKey === seatKey;
 
-                // Cellule de siège
-                const rectSiege = document.createElementNS(ns, "rect");
-                rectSiege.setAttribute("x", String(sx));
-                rectSiege.setAttribute("y", String(sy));
-                rectSiege.setAttribute("width", String(seatW));
-                rectSiege.setAttribute("height", String(tableH));
-                rectSiege.setAttribute("data-seat", seatKey);
-                rectSiege.setAttribute(
+                const rSeat = document.createElementNS(ns, "rect");
+                rSeat.setAttribute("x", String(sx));
+                rSeat.setAttribute("y", String(sy));
+                rSeat.setAttribute("width", String(seatW));
+                rSeat.setAttribute("height", String(tableH));
+                rSeat.setAttribute("data-seat", seatKey);
+                rSeat.setAttribute(
                     "class",
                     "seat-cell " +
-                    (estInterdit
-                        ? "seat-forbidden "
-                        : occupant != null
-                            ? "seat-occupied "
-                            : "seat-free ") +
-                    (estSelection ? "seat-selected" : ""),
+                    (isForbidden ? "seat-forbidden " : occ != null ? "seat-occupied " : "seat-free ") +
+                    (isSelectedSeat ? "seat-selected" : "")
                 );
-
-                if (estInterdit) {
-                    rectSiege.setAttribute("fill", "url(#forbidPattern)");
-                    rectSiege.setAttribute("stroke-width", "2");
+                if (isForbidden) {
+                    rSeat.setAttribute("fill", "url(#forbidPattern)");
+                    rSeat.setAttribute("stroke-width", "2");
                 } else {
-                    rectSiege.removeAttribute("fill");
-                    rectSiege.removeAttribute("stroke-width");
+                    rSeat.removeAttribute("fill");
+                    rSeat.removeAttribute("stroke-width");
                 }
-                svg.appendChild(rectSiege);
+                g.appendChild(rSeat);
 
-                // Croisillon d’overlay sur les sièges interdits
-                if (estInterdit) {
-                    const cross = document.createElementNS(ns, "path");
-                    const pad = Math.round(8 * UI_SCALE);
-                    const x1 = sx + pad,
-                        y1 = sy + pad;
-                    const x2 = sx + seatW - pad,
-                        y2 = sy + tableH - pad;
-                    const x3 = sx + pad,
-                        y3 = sy + tableH - pad;
-                    const x4 = sx + seatW - pad,
-                        y4 = sy + pad;
-                    cross.setAttribute("d", `M${x1},${y1} L${x2},${y2} M${x3},${y3} L${x4},${y4}`);
-                    cross.setAttribute("class", "seat-forbidden-cross");
-                    svg.appendChild(cross);
-                }
-
-                // Séparateur fin entre sièges
-// Séparateur fin entre sièges (scalé)
+                // séparateur entre sièges (ne capte pas les clics)
                 if (s < cap - 1) {
                     const divider = document.createElementNS(ns, "rect");
-
-                    // largeur du trait et padding vertical proportionnels à l'échelle
                     const dividerW = Math.max(1, Math.round(1 * UI_SCALE));
                     const dividerYPad = Math.round(6 * UI_SCALE);
-
                     divider.setAttribute("x", String(sx + seatW + seatGap / 2 - dividerW / 2));
                     divider.setAttribute("y", String(sy + dividerYPad));
                     divider.setAttribute("width", String(dividerW));
                     divider.setAttribute("height", String(tableH - 2 * dividerYPad));
                     divider.setAttribute("class", "seat-divider");
-                    svg.appendChild(divider);
+                    divider.setAttribute("pointer-events", "none");
+                    g.appendChild(divider);
                 }
 
-
-                // Label prénom/nom
-                if (occupant != null) {
+                // Label prénom/nom si occupé
+                if (occ != null) {
                     const nm =
                         state.nameView === "first"
-                            ? firstMap.get(occupant) || ""
+                            ? firstMap.get(occ) || ""
                             : state.nameView === "last"
-                                ? lastMap.get(occupant) || ""
-                                : bothMap.get(occupant) || "";
+                                ? lastMap.get(occ) || ""
+                                : bothMap.get(occ) || "";
 
                     const cx = sx + seatW / 2;
                     const cy = sy + tableH / 2;
-                    appendSeatLabelFitted(svg, cx, cy, seatW, tableH, nm, seatKey);
+                    appendSeatLabelFitted(g, cx, cy, seatW, tableH, nm, seatKey);
                 }
             }
 
-            ox += largeurTable + colGap;
+            // --- Grab strip (bandeau de sélection table)
+            // Bandeau au-dessus de la table : cliquable, quasi invisible.
+            const grabH = Math.max(10, Math.round(8 * UI_SCALE));
+            const grab = document.createElementNS(ns, "rect");
+            grab.setAttribute("x", "0");
+            grab.setAttribute("y", String(-grabH)); // au-dessus de la table
+            grab.setAttribute("width", String(tableW));
+            grab.setAttribute("height", String(grabH));
+            grab.setAttribute("data-table", tKey);
+            grab.setAttribute("class", "table-handle");
+            // invisible mais "peint" pour que les events SVG le prennent comme cible
+            grab.setAttribute("fill", "#000");
+            grab.setAttribute("fill-opacity", "0.001");
+            g.appendChild(grab);
+
+            // Avance le curseur horizontal pour la table suivante
+            ox += tableW + colGap;
         }
     }
 }
+
 
 /* ==========================================================================
    Rendu de la liste élèves

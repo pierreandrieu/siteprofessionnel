@@ -22,16 +22,62 @@ from ..modele.position import Position
 
 @enregistrer(TypeContrainte.PREMIERES_RANGEES)
 def _fab_premieres_rangees(code: Mapping[str, Any], ctx: ContexteFabrique):
-    nom: str = str(code["eleve"])  # nom stable
-    k: int = int(code["k"])       # nombre de rangées
-    return DoitEtreDansPremieresRangees(eleve=ctx.index_eleves_par_nom[nom], k=k)
+    """
+    Construit une contrainte "premières rangées".
+
+    Supporte un champ optionnel `metric`:
+      - "grid" (défaut): comparaison sur y logique,
+      - "px"           : comparaison visuelle (py), si le solveur a une géométrie.
+    """
+    nom: str = str(code["eleve"])
+    k: int = int(code["k"])
+    c = DoitEtreDansPremieresRangees(eleve=ctx.index_eleves_par_nom[nom], k=k)
+    metric_raw: str = str(code.get("metric", "grid")).strip().lower()
+    if metric_raw in {"grid", "px"}:
+        setattr(c, "metric", metric_raw)
+    return c
 
 
 @enregistrer(TypeContrainte.DERNIERES_RANGEES)
 def _fab_dernieres_rangees(code: Mapping[str, Any], ctx: ContexteFabrique):
+    """
+    Construit une contrainte "dernières rangées".
+
+    Supporte `metric` comme ci-dessus ("grid" par défaut, "px" si souhaité).
+    """
     nom: str = str(code["eleve"])
     k: int = int(code["k"])
-    return DoitEtreDansDernieresRangees(eleve=ctx.index_eleves_par_nom[nom], k=k, salle=ctx.salle)
+    c = DoitEtreDansDernieresRangees(eleve=ctx.index_eleves_par_nom[nom], k=k, salle=ctx.salle)
+    metric_raw: str = str(code.get("metric", "grid")).strip().lower()
+    if metric_raw in {"grid", "px"}:
+        setattr(c, "metric", metric_raw)
+    return c
+
+
+@enregistrer(TypeContrainte.ELOIGNES)
+def _fab_eloignes(code: Mapping[str, Any], ctx: ContexteFabrique):
+    """
+    Construit une contrainte d’éloignement (Manhattan).
+
+    Champs :
+      - d : int (>=1)
+      - metric : "grid" (défaut) ou "px"
+      - en_pixels : bool (héritage; équivalent à metric="px")
+    """
+    a_nom: str = str(code["a"])
+    b_nom: str = str(code["b"])
+    d: int = int(code["d"])
+    c = DoiventEtreEloignes(a=ctx.index_eleves_par_nom[a_nom],
+                            b=ctx.index_eleves_par_nom[b_nom],
+                            d=d)
+
+    # Compatibilité : en_pixels (bool) ou metric="px"
+    metric_raw: str = str(code.get("metric", "grid")).strip().lower()
+    en_pixels: bool = bool(code.get("en_pixels", False))
+    if en_pixels or metric_raw == "px":
+        setattr(c, "metric", "px")
+        setattr(c, "en_pixels", True)
+    return c
 
 
 @enregistrer(TypeContrainte.SEUL_A_TABLE)
@@ -53,14 +99,6 @@ def _fab_exact_seat(code: Mapping[str, Any], ctx: ContexteFabrique):
     y: int = int(code["y"])
     seat: int = int(code["seat"])
     return DoitEtreExactementIci(eleve=ctx.index_eleves_par_nom[nom], ou=Position(x=x, y=y, siege=seat))
-
-
-@enregistrer(TypeContrainte.ELOIGNES)
-def _fab_eloignes(code: Mapping[str, Any], ctx: ContexteFabrique):
-    a_nom: str = str(code["a"])  # élève A
-    b_nom: str = str(code["b"])  # élève B
-    d: int = int(code["d"])      # distance min (Manhattan)
-    return DoiventEtreEloignes(a=ctx.index_eleves_par_nom[a_nom], b=ctx.index_eleves_par_nom[b_nom], d=d)
 
 
 @enregistrer(TypeContrainte.MEME_TABLE)

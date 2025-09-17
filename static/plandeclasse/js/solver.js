@@ -113,6 +113,29 @@ export function setupSolveUI() {
     syncSolveButtonEnabled();
 }
 
+function sanitizeConstraintsForSolver(list) {
+    const out = [];
+    for (const c of list || []) {
+        if (!c || c.type === "_batch_marker_" || c.type === "_objective_") continue;
+        if (c.type === "forbid_seat") continue; // déjà porté par `forbidden`
+
+        // On conserve metric / en_pixels si présents
+        const {
+            type, a, b, x, y, s, k, d,
+            metric, en_pixels, seat // seat toléré (exact_seat)
+        } = c;
+
+        const cc = {type, a, b, x, y, s, k, d};
+        if (seat != null && cc.s == null) cc.seat = seat;
+        if (metric != null) cc.metric = String(metric).trim().toLowerCase();
+        if (en_pixels != null) cc.en_pixels = !!en_pixels;
+
+        out.push(cc);
+    }
+    return out;
+}
+
+
 /* ==========================================================================
    Payload solveur
    ========================================================================== */
@@ -124,8 +147,6 @@ export function setupSolveUI() {
  *   pour qu’ils soient verrouillés côté solveur (exact_seat).
  */
 export function buildSolvePayload() {
-    // 1) Récupère la source la plus fournie des placements
-    //    (selon tes versions : placements, fixedPlacements, pinned, lockedSeats, placedByStudent)
     const candidates = [
         etat.placements,
         etat.fixedPlacements,
@@ -137,16 +158,21 @@ export function buildSolvePayload() {
     ].filter(Boolean);
 
     let source = candidates.find(m => m && m.size) || new Map();
+    let lockedPlacements = Object.fromEntries(source);
 
-    // 2) Objet plat "x,y,s": id
-    const lockedPlacements = Object.fromEntries(source);
-
-    // 3) Verrouillage : par défaut true, et de toute façon true s’il y a au moins 1 placement
-
-    // Si l’UI contient des exact_seat, on n’utilise PAS lock_placements (évite doublons backend)
     const hasExact = etat.constraints.some((c) => c.type === "exact_seat");
-    const lockFromState = Object.prototype.hasOwnProperty.call(etat.options, "lock_placements")? !!etat.options.lock_placements : true;
+    if (hasExact) lockedPlacements = {};
+
+    const lockFromState = Object.prototype.hasOwnProperty.call(etat.options, "lock_placements")
+        ? !!etat.options.lock_placements
+        : true;
     const lock_placements = hasExact ? false : (lockFromState || Object.keys(lockedPlacements).length > 0);
+
+    //  ordre visuel des rangées (haut -> bas)
+    const visual_row_order = computeVisualRowOrder(); // déjà là
+    const visual_row_map = computeVisualRowMap();     // NEW
+
+    const solverChoice = visual_row_order && visual_row_order.length ? "cpsat" : (etat.options.solver || "asp");
 
     return {
         schema: etat.schema,
@@ -155,20 +181,24 @@ export function buildSolvePayload() {
             name: s.name,
             first: s.first,
             last: s.last,
-            gender: s.gender ?? null,
+            gender: s.gender ?? null
         })),
-        options: {...etat.options, lock_placements},   // <-- clé attendue côté backend
-        constraints: etat.constraints,
+        options: {
+            ...etat.options,
+            solver: solverChoice,
+            lock_placements,
+            visual_row_order: visual_row_order || null
+        },
+        constraints: sanitizeConstraintsForSolver(etat.constraints),
         forbidden: Array.from(etat.forbidden),
         placements: lockedPlacements,
         name_view: etat.nameView,
+        visual_row_map: visual_row_map || null,
     };
 }
-
-
-/* ==========================================================================
-   Démarrage + polling
-   ========================================================================== */
+    /* ==========================================================================
+       Démarrage + polling
+       ========================================================================== */
 
 // États "en cours" côté backend
 const ETATS_EN_COURS = new Set(["PENDING", "RECEIVED", "STARTED", "RETRY"]);
@@ -328,3 +358,81 @@ export async function startSolve() {
         nettoyerApresSolve();
     }
 }
+
+// solver.js
+function mediane(nums) {
+    const a = [...nums].sort((x, y) => x - y);
+    const m = Math.floor(a.length / 2);
+    return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+}
+
+function computeVisualRowOrder() {
+    const svg = document.getElementById("roomCanvas");
+    if (!svg) return null;
+
+    const rows = new Map(); // y -> [centresY]
+    svg.querySelectorAll("g[data-table]").forEach(g => {
+        const tk = g.getAttribute("data-table");
+        if (!tk) return;
+        const [, yStr] = tk.split(",");
+        const y = Number(yStr);
+        const m = /translate\(\s*([-\d.]+)\s*,\s*([-\d.]+)\s*\)/.exec(g.getAttribute("transform") || "");
+        const ty = m ? Number(m[2]) : 0;
+        const rect = g.querySelector("rect.table-rect");
+        const h = rect ? Number(rect.getAttribute("height") || "0") : 0;
+        const cy = ty + h / 2;
+        if (!rows.has(y)) rows.set(y, []);
+        rows.get(y).push(cy);
+    });
+
+    const infos = Array.from(rows.entries()).map(([y, arr]) => ({y, med: mediane(arr)}));
+    if (!infos.length) return null;
+    infos.sort((a, b) => a.med - b.med);
+    return infos.map(r => r.y);
+}
+
+
+// mappe chaque table (x,y) vers une "rangée visuelle" 0..R-1.
+// Idée : on trie toutes les tables par leur Y-centre courant, puis on
+// partitionne ce tri global en groupes de tailles identiques aux rangées
+// du schéma (on conserve donc le nombre de tables par rangée).
+function computeVisualRowMap() {
+    const svg = document.getElementById("roomCanvas");
+    if (!svg) return null;
+
+    // 1) Collecte centres Y des tables affichées
+    const tables = []; // {tk:"x,y", x,y, cy}
+    svg.querySelectorAll("g[data-table]").forEach(g => {
+        const tk = g.getAttribute("data-table") || "";
+        const [xs, ys] = tk.split(",");
+        const x = Number(xs), y = Number(ys);
+        const m = /translate\(\s*([-\d.]+)\s*,\s*([-\d.]+)\s*\)/.exec(g.getAttribute("transform") || "");
+        const ty = m ? Number(m[2]) : 0;
+        const rect = g.querySelector("rect.table-rect");
+        const h = rect ? Number(rect.getAttribute("height") || "0") : 0;
+        const cy = ty + h / 2;
+        tables.push({tk, x, y, cy});
+    });
+    if (!tables.length) return null;
+
+    // 2) Tailles des rangées (en nombre de tables réelles, cap>0)
+    const tailles = etat.schema.map(r => r.filter(c => c > 0).length);
+    const total = tailles.reduce((a, b) => a + b, 0);
+    if (total !== tables.length) return null; // garde-fou
+
+    // 3) Tri global haut -> bas
+    tables.sort((a, b) => a.cy - b.cy);
+
+    // 4) Partition séquentielle selon tailles (conserve la "cardinalité" des rangées)
+    const visMap = {}; // "x,y" -> rangéeVisuelle
+    let i = 0;
+    for (let r = 0; r < tailles.length; r++) {
+        const n = tailles[r];
+        for (let k = 0; k < n; k++, i++) {
+            const t = tables[i];
+            if (t) visMap[t.tk] = r;
+        }
+    }
+    return visMap;
+}
+

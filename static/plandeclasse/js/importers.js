@@ -151,18 +151,30 @@ function validateExportJSON(data) {
 
 /**
  * Importe un JSON d’export produit par l’outil.
+ * Réécrite pour:
+ *  - intégrer table_offsets,
+ *  - appeler reconcileAfterSchemaChange() avant refresh UI,
+ *  - garder la tolérance existante.
  * @param {any} data
  */
 function importFromExportJSON(data) {
-    if (!validateExportJSON(data)) {
+    if (!data || typeof data !== "object" || (data.format && data.format !== "plandeclasse-export")) {
         alert("Fichier JSON non reconnu (pas un export de cet outil).");
         return;
     }
 
     // Reset (sauf options)
-    hardResetButKeepOptions();
+    state.schema = [];
+    state.forbidden.clear();
+    state.placements.clear();
+    state.placedByStudent.clear();
+    state.selection.studentId = null;
+    state.selection.seatKey = null;
+    state.selection.tableKey = null;
+    state.constraints = [];
+    state.tableOffsets.clear();
 
-    // Nom de classe (UI)
+    // Nom de classe
     const classInput = /** @type {HTMLInputElement|null} */ ($("#className"));
     if (classInput) classInput.value = String(data.class_name || "").trim();
     syncExportButtonEnabled();
@@ -172,14 +184,13 @@ function importFromExportJSON(data) {
         state.nameView = data.name_view;
     }
 
-    // Schéma (copie par valeur)
+    // Schéma
     state.schema = Array.isArray(data.schema) ? data.schema.map((row) => row.slice()) : [];
 
-    // Élèves (tolérant : si pas de first/last, on split depuis name)
+    // Élèves
     state.students = (data.students || []).map((s, i) => {
         const id = Number.isFinite(s.id) ? Number(s.id) : i;
         const name = String(s.name || "").trim();
-
         let first = String(s.first || "");
         let last = String(s.last || "");
         if (!first && !last && name) {
@@ -187,18 +198,18 @@ function importFromExportJSON(data) {
             first = parts.first;
             last = parts.last;
         }
-
         const gender = s.gender === "F" || s.gender === "M" ? s.gender : null;
         return {id, name, first, last, gender};
     });
 
-    // Contraintes (copie par valeur) — on ignore les marqueurs UI-only (_objective_)
+    // Contraintes (on ignore _objective_)
     const rawConstraints = Array.isArray(data.constraints) ? data.constraints.slice() : [];
     state.constraints = rawConstraints.filter((c) => c?.type !== "_objective_");
+
     // Sièges interdits
     state.forbidden = new Set(Array.isArray(data.forbidden) ? data.forbidden : []);
 
-    // Placements (deux index cohérents)
+    // Placements
     state.placements.clear();
     state.placedByStudent.clear();
     const placementsObj = data.placements || {};
@@ -210,21 +221,55 @@ function importFromExportJSON(data) {
         }
     }
 
+    // Options (tolérant)
     if (data.options && typeof data.options === "object") {
         const o = data.options;
         state.options = {
-            ...state.options, // conserve les valeurs existantes par défaut
+            ...state.options,
             solver: typeof o.solver === "string" ? o.solver : state.options.solver,
             prefer_mixage: !!o.prefer_mixage,
             prefer_alone: !!o.prefer_alone,
             lock_placements: !!o.lock_placements,
-            time_budget_ms: Number.isFinite(o.time_budget_ms)
-                ? Number(o.time_budget_ms)
-                : state.options.time_budget_ms,
+            time_budget_ms: Number.isFinite(o.time_budget_ms) ? Number(o.time_budget_ms) : state.options.time_budget_ms,
         };
     }
 
-    refreshAllUI();
+    // NEW: Offsets de tables
+    state.tableOffsets.clear();
+    if (data.table_offsets && typeof data.table_offsets === "object") {
+        for (const [k, v] of Object.entries(data.table_offsets)) {
+            const dx = Number(v?.dx) || 0;
+            const dy = Number(v?.dy) || 0;
+            state.tableOffsets.set(k, {dx, dy});
+        }
+    }
+
+    // Recalage global puis refresh UI
+    reconcileAfterSchemaChange();
+
+    // Radios noms + options (comme avant)
+    const prenom = /** @type {HTMLInputElement|null} */ ($("#nvPrenom"));
+    const nom = /** @type {HTMLInputElement|null} */ ($("#nvNom"));
+    const both = /** @type {HTMLInputElement|null} */ ($("#nvPrenomNom"));
+    if (prenom && nom && both) {
+        prenom.checked = state.nameView === "first";
+        nom.checked = state.nameView === "last";
+        both.checked = state.nameView === "both";
+    }
+    const optMix = /** @type {HTMLInputElement|null} */ ($("#optMixage"));
+    const optSolo = /** @type {HTMLInputElement|null} */ ($("#optSolo"));
+    const optLock = /** @type {HTMLInputElement|null} */ ($("#optLockPlacements"));
+    if (optMix) optMix.checked = !!state.options.prefer_mixage;
+    if (optSolo) optSolo.checked = !!state.options.prefer_alone;
+    if (optLock) optLock.checked = !!state.options.lock_placements;
+
+    refreshConstraintSelectors();
+    renderConstraints();
+    renderStudents();
+    renderRoom();
+    updateBanButtonLabel();
+    syncSolveButtonEnabled();
+    renderRowsEditor();
 }
 
 /* ==========================================================================

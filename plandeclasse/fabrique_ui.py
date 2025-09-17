@@ -1,6 +1,6 @@
 # app_plandeclasse/fabrique_ui.py
 from __future__ import annotations
-from typing import Any, Dict, List, Mapping, Sequence, Set, Tuple
+from typing import Any, Dict, List, Mapping, Sequence, Tuple
 
 from .contraintes.registre import ContexteFabrique, contrainte_depuis_code
 from .contraintes.base import Contrainte
@@ -37,21 +37,26 @@ def fabrique_contraintes_ui(
         placements: Mapping[str, int],
         respecter_placements_existants: bool = True,
 ) -> List[Contrainte]:
+    """
+    Traduit la liste brute des contraintes UI en objets métier via le registre.
+    - Propage désormais 'metric' pour front/back rows, et
+      'metric'/'en_pixels' pour far_apart.
+    - Tolère les clés UI optionnelles et plusieurs formats de clés siège.
+    """
     index_eleves_par_nom: Dict[str, Eleve] = {e.nom: e for e in eleves}
     ctx = ContexteFabrique(salle=salle, index_eleves_par_nom=index_eleves_par_nom)
     id2nom = _id2nom_map(students_payload)
 
     out: List[Contrainte] = []
 
-    # 1) contraintes explicites de l’UI (on ignore les marqueurs UI)
     for c in constraints_ui or []:
         typ: str = str(c.get("type", "")).strip()
         if typ in {"_batch_marker_", "_objective_", ""}:
-            continue  # purement UI, on saute
+            continue
 
         code: Dict[str, Any] = {"type": typ}
 
-        # Unaires (dont EXACT_SEAT)
+        # ---------- Unaires ----------
         if typ in {
             TypeContrainte.PREMIERES_RANGEES.value,
             TypeContrainte.DERNIERES_RANGEES.value,
@@ -62,16 +67,21 @@ def fabrique_contraintes_ui(
         }:
             sid_raw = c.get("eleve", c.get("a", c.get("studentId")))
             if sid_raw is None:
-                # on ignore plutôt que raise pour être tolérant
                 continue
             sid = int(sid_raw)
-            code["eleve"] = id2nom.get(sid, None)
+            code["eleve"] = id2nom.get(sid)
             if not code["eleve"]:
-                continue  # id inconnu → on ignore
+                continue
 
-            if "k" in c: code["k"] = int(c["k"])
+            if "k" in c:
+                code["k"] = int(c["k"])
 
-            # EXACT_SEAT : accepter x/y/s ou bien key="x,y,s"
+            # propage 'metric' pour front/back rows si présent (grid | px)
+            if typ in {TypeContrainte.PREMIERES_RANGEES.value, TypeContrainte.DERNIERES_RANGEES.value}:
+                if "metric" in c and str(c["metric"]).strip():
+                    code["metric"] = str(c["metric"]).strip().lower()
+
+            # EXACT_SEAT : accepte key="x,y,s" ou bien x/y/s séparés
             if typ == TypeContrainte.EXACT_SEAT.value:
                 if "key" in c and isinstance(c["key"], str):
                     xx, yy, ss = _key_forbid(c["key"])
@@ -82,26 +92,33 @@ def fabrique_contraintes_ui(
                     if "s" in c: code["seat"] = int(c["s"])
                     if "seat" in c: code["seat"] = int(c["seat"])
 
-        # Binaires
+        # ---------- Binaires ----------
         elif typ in {
             TypeContrainte.ELOIGNES.value,
             TypeContrainte.MEME_TABLE.value,
             TypeContrainte.ADJACENTS.value,
         }:
             try:
-                a_id = int(c["a"]);
+                a_id = int(c["a"])
                 b_id = int(c["b"])
             except Exception:
                 continue
-            code["a"] = id2nom.get(a_id);
+            code["a"] = id2nom.get(a_id)
             code["b"] = id2nom.get(b_id)
             if not code["a"] or not code["b"]:
                 continue
-            if "d" in c: code["d"] = int(c["d"])
 
-        # Structurelles
+            if "d" in c:  # far_apart
+                code["d"] = int(c["d"])
+            # propage 'metric' / 'en_pixels' si présents (tolérant)
+            if "metric" in c and str(c["metric"]).strip():
+                code["metric"] = str(c["metric"]).strip().lower()
+            if "en_pixels" in c:
+                code["en_pixels"] = bool(c["en_pixels"])
+
+        # ---------- Structurelles ----------
         elif typ == TypeContrainte.TABLE_INTERDITE.value:
-            code["x"] = int(c["x"]);
+            code["x"] = int(c["x"])
             code["y"] = int(c["y"])
 
         elif typ == TypeContrainte.SIEGE_INTERDIT.value:
@@ -109,17 +126,16 @@ def fabrique_contraintes_ui(
                 xx, yy, ss = _key_forbid(c["key"])
                 code["x"], code["y"], code["seat"] = xx, yy, ss
             else:
-                code["x"] = int(c["x"]);
+                code["x"] = int(c["x"])
                 code["y"] = int(c["y"])
                 code["seat"] = int(c.get("seat", c.get("s")))
 
         else:
-            # inconnu -> ignore en silence (UI future / versions anciennes)
             continue
 
         out.append(contrainte_depuis_code(code, ctx))
 
-    # 2) sièges interdits additionnels (state.forbidden) sans doublons
+    # ---------- Sièges interdits additionnels ----------
     deja = {
         (int(getattr(c, "x", -999)), int(getattr(c, "y", -999)), int(getattr(c, "seat", -999)))
         for c in out if c.__class__.__name__ == "SiegeDoitEtreVide"
@@ -131,9 +147,8 @@ def fabrique_contraintes_ui(
                 {"type": TypeContrainte.SIEGE_INTERDIT.value, "x": x, "y": y, "seat": s}, ctx
             ))
 
-    # 3) placements imposés -> exact_seat (optionnel)
+    # ---------- Placements imposés -> exact_seat (optionnel) ----------
     if respecter_placements_existants:
-        # On évite les doublons : si l’UI a déjà fourni EXACT_SEAT pour un élève, on ne ré-injecte pas
         deja_exact = {
             getattr(c, "eleve").nom
             for c in out
@@ -149,3 +164,4 @@ def fabrique_contraintes_ui(
             ))
 
     return out
+

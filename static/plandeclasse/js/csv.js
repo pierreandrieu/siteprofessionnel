@@ -132,7 +132,8 @@ export function extractGender(cell) {
     // FR/EN : formes courantes
     if (/^(f|feminin|féminin|female|fille)$/u.test(noTags)) return "F";
     if (/^(g|garcon|gar\u00e7on)$/u.test(noTags)) return "M";
-    if (/^(m|masculin|male|garcon|gar\u00e7on)$/u.test(noTags)) return "M";
+    if (/^(m|masculin|male)$/u.test(noTags)) return "M";
+
 
     // Abréviations fréquentes (H/F, M/F…)
     if (/^\s*f\s*\/\s*m\s*$/i.test(noTags)) return null; // intitulé

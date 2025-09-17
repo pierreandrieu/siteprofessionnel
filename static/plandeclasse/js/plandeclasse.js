@@ -44,10 +44,7 @@ import {
 } from "plandeclasse/schema";
 
 // Export
-import {
-    setupExportUI as preparerUIExport,
-    startExport as demarrerExport,
-} from "plandeclasse/export";
+import {setupExportUI as preparerUIExport} from "plandeclasse/export";
 
 // Solveur
 import {
@@ -187,7 +184,6 @@ function initialiser() {
     etat.options.lock_placements = !!document.getElementById("optLockPlacements")?.checked;
 
     // --- Export
-    document.getElementById("btnExport")?.addEventListener("click", demarrerExport);
     preparerUIExport();
 
     // --- Solveur : helpers (activation + tooltip)
@@ -256,7 +252,7 @@ function initialiser() {
                 }
             }
             etat.constraints = [];
-            +rendreSalle();
+            rendreSalle();
             rendreEleves();
             rendreContraintes();
             majBoutonBan();

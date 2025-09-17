@@ -15,6 +15,9 @@
 /** Clé canonique d’un siège (x,y,s) sous forme "x,y,s". */
 /// typedef {string} SeatKey
 
+/** Clé d'une table (x,y) sous forme "x,y". */
+/// typedef {string} TableKey
+
 /**
  * Types de contraintes "élève".
  * @typedef {"front_rows"|"back_rows"|"solo_table"|"empty_neighbor"|"no_adjacent"|"same_table"|"far_apart"|"forbid_seat"|"exact_seat"} ConstraintType
@@ -71,6 +74,7 @@
  * @typedef {Object} UiSelection
  * @property {number|null} studentId
  * @property {SeatKey|null} seatKey
+ * @property {string|null} tableKey
  */
 
 /**
@@ -85,6 +89,8 @@
  * @property {UiOptions} options
  * @property {"first"|"last"|"both"} nameView
  * @property {Constraint[]} constraints
+ * @property {Map<TableKey, {dx:number, dy:number}>} tableOffsets
+ * @property {{nudge: null | {tableKey:TableKey, dx:number, dy:number, invalid:boolean}}} uiDraft // NEW
  */
 
 /* ==========================================================================
@@ -101,7 +107,7 @@ const OPTIONS_DEFAUT = {
 };
 
 /** @type {UiSelection} */
-const SELECTION_VIDE = {studentId: null, seatKey: null};
+const SELECTION_VIDE = {studentId: null, seatKey: null, tableKey: null};
 
 /* ==========================================================================
    Objet d’état exporté (mutable par les autres modules)
@@ -135,6 +141,15 @@ export const state = {
 
     // Contraintes UI (lisibles par l’humain) + marqueurs UI → envoyés au solveur (les _batch/_objective_ sont filtrés côté backend si nécessaire)
     constraints: [],
+
+
+    // offset par table (x,y) -> {dx,dy} en unités SVG
+    tableOffsets: new Map(),
+
+    // brouillon de déplacement clavier (ghost)
+    uiDraft: {
+        nudge: null,
+    },
 };
 
 /* ==========================================================================
@@ -142,18 +157,27 @@ export const state = {
    ========================================================================== */
 
 /**
- * Réinitialise la sélection courante.
- * Pratique pour éviter de réécrire l’objet à la main.
+ * Réinitialise la sélection courante (élève, siège et table).
+ * Utile pour éviter les états ambigus.
  */
 export function clearSelection() {
     state.selection.studentId = null;
     state.selection.seatKey = null;
+    state.selection.tableKey = null;
 }
+
 
 /**
  * Réinitialise les options vers les valeurs par défaut.
- * Utile si on veut offrir un bouton "réinitialiser options".
  */
 export function resetOptionsToDefault() {
     state.options = {...OPTIONS_DEFAUT};
+}
+
+/**
+ * Efface le “draft” de déplacement (fantôme).
+ * À appeler sur `Escape`, après validation `Enter`, ou lors d’un re-render global.
+ */
+export function clearTableNudgeDraft() {
+    state.uiDraft.nudge = null;
 }

@@ -7,7 +7,7 @@ from typing import List
 from .modele.eleve import Eleve
 from .modele.salle import Salle
 from .modele.position import Position
-from .solveurs.aleatoire import SolveurAleatoireRetourArriere
+from .solveurs.cpsat import SolveurCPSAT
 from .contraintes.unaires import DoitEtreDansPremieresRangees, DoitEtreSeulALaTable, DoitEtreExactementIci
 from .contraintes.binaires import DoiventEtreEloignes, DoiventEtreSurMemeTable, DoiventEtreAdjacents
 from .contraintes.structurelles import TableDoitEtreVide
@@ -45,7 +45,7 @@ def construire_exemple() -> None:
         DoitEtreExactementIci(eleve=eleves[8], ou=Position(x=0, y=0, siege=0)),
     ]
 
-    solveur = SolveurAleatoireRetourArriere()
+    solveur = SolveurCPSAT(prefer_alone=True, prefer_mixage=True, seed=42)
     res = solveur.resoudre(salle=salle, eleves=eleves, contraintes=contraintes, essais_max=200_000)
 
     if res.affectation is None:
@@ -67,7 +67,7 @@ def construire_exemple() -> None:
     print(json.dumps(codes, ensure_ascii=False, indent=2))
 
     # reconstruction
-    ctx = ContexteFabrique(salle=salle, index_eleves_par_nom={e.nom(): e for e in eleves})
+    ctx = ContexteFabrique(salle=salle, index_eleves_par_nom={e.nom: e for e in eleves})
     reconstruites = [contrainte_depuis_code(code, ctx) for code in codes]
     assert all(c1.code_machine() == c2.code_machine() for c1, c2 in zip(contraintes, reconstruites))
     print("\n(reconstruction via fabrique : OK)")

@@ -12,15 +12,12 @@ from .fabrique_ui import fabrique_contraintes_ui
 from .utils_locks import inject_locked_placements_as_exact_constraints
 from .utils_svg import svg_from_layout
 from .contraintes.unaires import DoitEtreExactementIci
-from .contraintes.structurelles import TableDoitEtreVide, SiegeDoitEtreVide
-from .modele.position import Position
 
-# Solveurs disponibles : ASP (Clingo) et CP-SAT (OR-Tools)
-from .solveurs.asp import SolveurClingo
+# Solveurs disponibles
+from .solveurs.asp import SolveurClingo  # historique ASP (fallback)
 
 try:
-    # Import conditionnel pour permettre un fallback si OR-Tools n'est pas installé
-    from .solveurs.cpsat import SolveurCPSAT
+    from .solveurs.cpsat import SolveurCPSAT  # type: ignore
 
     _HAS_CPSAT = True
 except Exception:
@@ -39,7 +36,6 @@ def _eleves_from_payload(students: Sequence[Dict[str, Any]]) -> List[Eleve]:
     """
     Convertit le payload UI en objets Eleve.
     Important : 'name' (texte brut CSV) est utilisé pour correspondre exactement à Eleve.nom.
-    Le genre est passé tel quel (permet F/G, f/m, féminin/masculin ...).
     """
     out: List[Eleve] = []
     for s in sorted(students, key=lambda z: int(z["id"])):
@@ -57,7 +53,8 @@ def _order_ui_ids(students: Sequence[Dict[str, Any]]) -> List[int]:
 def _parse_options(options: Dict[str, Any]) -> Dict[str, Any]:
     """
     Normalise les options et pose les défauts.
-    Options reconnues (toutes facultatives) :
+
+    Champs reconnus (tous facultatifs) :
       - solver: "cpsat" | "asp"
       - prefer_alone: bool
       - prefer_mixage: bool
@@ -66,14 +63,22 @@ def _parse_options(options: Dict[str, Any]) -> Dict[str, Any]:
       - random_seed: int | null
       - shuffle_students: bool
       - tiebreak_random: bool
-      - vary_each_run: bool  (si true et random_seed absent ⇒ seed aléatoire)
+      - vary_each_run: bool
+      - visual_row_order: list[int] | None
+      - geometry: dict | None
+      - table_offsets: list | dict | None
+      - visual_row_map: dict | None   # ← NEW (peut être posé plus tard par t_solve)
     """
-    o = {**options}
+    o: Dict[str, Any] = {**(options or {})}
+
+    # rétro-compat
     if "lock_placements" not in o and "respect_existing" in o:
         try:
             o["lock_placements"] = bool(o["respect_existing"])
         except Exception:
             pass
+
+    # scalaires
     o["solver"] = str(o.get("solver", "asp")).lower().strip()
     o["prefer_alone"] = bool(o.get("prefer_alone", True))
     o["prefer_mixage"] = bool(o.get("prefer_mixage", True))
@@ -82,49 +87,147 @@ def _parse_options(options: Dict[str, Any]) -> Dict[str, Any]:
     o["shuffle_students"] = bool(o.get("shuffle_students", False))
     o["tiebreak_random"] = bool(o.get("tiebreak_random", True))
 
-    seed_raw = o.get("random_seed", None)
-    seed: Optional[int]
+    # graine
+    seed_raw: Any = o.get("random_seed", None)
     if seed_raw is None:
-        # graine aléatoire si demandé
         if bool(o.get("vary_each_run", False)):
             import secrets
-            seed = secrets.randbelow(2 ** 31 - 1)
+            o["random_seed"] = secrets.randbelow(2 ** 31 - 1)
         else:
-            seed = None
+            o["random_seed"] = None
     else:
         try:
-            seed = int(seed_raw)
+            o["random_seed"] = int(seed_raw)
         except Exception:
-            seed = None
-    o["random_seed"] = seed
+            o["random_seed"] = None
+
+    # visual_row_order : liste d’entiers ou None
+    vro = o.get("visual_row_order", None)
+    if isinstance(vro, list):
+        try:
+            o["visual_row_order"] = [int(v) for v in vro]
+        except Exception:
+            o["visual_row_order"] = None
+    else:
+        o["visual_row_order"] = None
+
+    # objets bruts (tolérance)
+    if "geometry" in o and not isinstance(o["geometry"], dict):
+        o["geometry"] = None
+    if "table_offsets" in o and not isinstance(o["table_offsets"], (dict, list)):
+        o["table_offsets"] = None
+
+    # visual_row_map est validé plus tard ; on laisse tel quel si présent
     return o
 
 
-def _make_solver(options: Dict[str, Any]):
+def _make_solver(options: Dict[str, Any]) -> Tuple[Optional[object], Optional[str]]:
     """
-    Instancie le solveur en fonction des options.
-    Les options de variabilité n'ont d'effet que pour CP-SAT.
+    Instancie le solveur depuis `options` et retourne `(solver, err)`.
+
+    - Si l'UI fournit un ordre visuel (`visual_row_order`) OU une géométrie (`geometry`)
+      OU des offsets de tables (`table_offsets`) OU une **visual_row_map** (par table),
+      on force **CPSAT** (ordre visuel/px).
+    - Sinon, on respecte `options["solver"]` (défaut "asp").
     """
-    solver_name = options["solver"]
-    if solver_name == "cpsat":
-        if not _HAS_CPSAT:
-            return None, {"status": "FAILURE", "error": "Solveur CPSAT indisponible (OR-Tools non installé)."}
-        slv = SolveurCPSAT(  # type: ignore[call-arg]
-            prefer_alone=options["prefer_alone"],
-            prefer_mixage=options["prefer_mixage"],
-            seed=options["random_seed"],
-            randomize_order=options["shuffle_students"],
-            tiebreak_random=options["tiebreak_random"],
-        )
+    try:
+        solver_name: str = str(options.get("solver", "asp")).lower()
+
+        if options.get("visual_row_order") or options.get("geometry") or options.get("table_offsets") or options.get(
+                "visual_row_map"):
+            solver_name = "cpsat"
+
+        if solver_name == "cpsat":
+            if not _HAS_CPSAT:
+                return None, "Solveur CPSAT indisponible (OR-Tools non installé)."
+
+            # Import local (évite un import global lourd)
+            try:
+                from plandeclasse.solveurs.cpsat import SolveurCPSAT, GeomPixels  # type: ignore
+            except Exception as e:
+                return None, f"Impossible d'importer SolveurCPSAT/OR-Tools: {e}"
+
+            # --- Géométrie (facultative)
+            geom_opts = options.get("geometry")
+            geom: Optional["GeomPixels"] = None
+            if isinstance(geom_opts, dict):
+                try:
+                    geom = GeomPixels(
+                        table_pitch_x=int(geom_opts.get("table_pitch_x", 1)),
+                        table_pitch_y=int(geom_opts.get("table_pitch_y", 1)),
+                        seat_pitch_x=int(geom_opts.get("seat_pitch_x", 1)),
+                        seat_offset_x=int(geom_opts.get("seat_offset_x", 0)),
+                        seat_offset_y=int(geom_opts.get("seat_offset_y", 0)),
+                    )
+                except Exception as e:
+                    return None, f"Géométrie invalide dans options['geometry']: {e}"
+
+            # --- Offsets de tables
+            table_offsets_raw = options.get("table_offsets")
+            table_offsets: Dict[Tuple[int, int], Tuple[int, int]] = {}
+            if isinstance(table_offsets_raw, dict):
+                for k, v in table_offsets_raw.items():
+                    if isinstance(k, str) and "," in k:
+                        try:
+                            xs, ys = k.split(",", 1)
+                            if isinstance(v, (list, tuple)) and len(v) >= 2:
+                                table_offsets[(int(xs), int(ys))] = (int(v[0]), int(v[1]))
+                            elif isinstance(v, dict):
+                                table_offsets[(int(xs), int(ys))] = (int(v.get("dx", 0)), int(v.get("dy", 0)))
+                        except Exception:
+                            continue
+            elif isinstance(table_offsets_raw, list):
+                for item in table_offsets_raw:
+                    try:
+                        if isinstance(item, (list, tuple)) and len(item) >= 4:
+                            x, y, dx, dy = item[0], item[1], item[2], item[3]
+                            table_offsets[(int(x), int(y))] = (int(dx), int(dy))
+                        elif isinstance(item, dict):
+                            x, y = int(item.get("x")), int(item.get("y"))
+                            dx, dy = int(item.get("dx", 0)), int(item.get("dy", 0))
+                            table_offsets[(x, y)] = (dx, dy)
+                    except Exception:
+                        continue
+
+            # --- Visual row map (par table) — "x,y" -> rang_visuel
+            row_map_ui: Optional[Dict[Tuple[int, int], int]] = None
+            vrm_raw = options.get("visual_row_map")
+            if isinstance(vrm_raw, dict):
+                row_map_ui = {}
+                for k, v in vrm_raw.items():
+                    try:
+                        if isinstance(k, str) and "," in k:
+                            xs, ys = k.split(",", 1)
+                            row_map_ui[(int(xs), int(ys))] = int(v)
+                    except Exception:
+                        continue
+
+            row_order_ui: Optional[list[int]] = options.get("visual_row_order")
+
+            slv = SolveurCPSAT(
+                prefer_alone=bool(options.get("prefer_alone", True)),
+                prefer_mixage=bool(options.get("prefer_mixage", True)),
+                seed=options.get("random_seed"),
+                randomize_order=bool(options.get("shuffle_students", False)),
+                tiebreak_random=bool(options.get("tiebreak_random", True)),
+                geom=geom,
+                table_offsets=table_offsets or None,
+                row_order_ui=row_order_ui or None,
+                row_map_ui=row_map_ui or None,  # ← NEW
+            )
+            return slv, None
+
+        # ---------- Solveur ASP (comportement historique grille) ----------
+        try:
+            from plandeclasse.solveurs.asp import SolveurASP  # type: ignore
+        except Exception as e:
+            return None, f"Impossible d'importer SolveurASP: {e}"
+
+        slv = SolveurASP()
         return slv, None
-    else:
-        # Solveur ASP (Clingo) — pas de variabilité spécifique ici
-        slv = SolveurClingo(
-            prefer_alone=options["prefer_alone"],
-            prefer_mixage=options["prefer_mixage"],
-            models=1,
-        )
-        return slv, None
+
+    except Exception as e:
+        return None, f"Echec _make_solver: {e}"
 
 
 def _build_constraints(
@@ -164,19 +267,15 @@ def _solve(
             "status": "FAILURE",
             "error": (
                 "Aucune solution trouvée. Vos contraintes sont incompatibles entre elles "
-                "ou avec la disposition de la salle. Essayez l’une des pistes suivantes : "
-                "modifier les valeurs des paramètres k ou d, retirer une contrainte de groupe, "
-                "ou libérer quelques sièges interdits, puis relancez."
+                "ou avec la disposition de la salle. Essayez : diminuer k/d, retirer une "
+                "contrainte de groupe, ou libérer quelques sièges interdits, puis relancez."
             ),
         }
     return res, None
 
 
 def _reconstruct_assignment(eleves: List[Eleve], ui_ids_in_order: List[int], affectation) -> Dict[str, int]:
-    """
-    Reconstruit {seatKey -> studentId} en se basant sur l’ordre stable (trié par id)
-    et sur la map affectation {Eleve -> Position}.
-    """
+    """Reconstruit {seatKey -> studentId} à partir de l’ordre stable (trié par id)."""
     assignment: Dict[str, int] = {}
     for idx, e in enumerate(eleves):
         pos = affectation.get(e)
@@ -209,7 +308,7 @@ def _render_and_cache_exports(
     )
     png_bytes = svg2png(bytestring=svg.encode("utf-8"))
     pdf_bytes = svg2pdf(bytestring=svg.encode("utf-8"))
-    txt_str = ""  # la liste lisible des contraintes est déjà côté UI ; on peut la passer à part si voulu
+    txt_str = ""  # (optionnel) liste lisible des contraintes
 
     import secrets
     token = secrets.token_urlsafe(16)
@@ -235,59 +334,62 @@ def t_solve_plandeclasse(self, payload: Dict[str, Any]) -> Dict[str, Any]:
     Tâche asynchrone de résolution :
       - traduit le payload UI en salle/élèves/contraintes,
       - choisit un solveur (ASP ou CP-SAT) selon options,
-      - exécute la résolution avec éventuel budget temps,
-      - rend l’affectation et prépare les exports (SVG/PNG/PDF/TXT) en cache.
+      - exécute la résolution,
+      - rend l’affectation et prépare les exports en cache.
     """
     # ----------- Lecture du payload brut -----------
     schema: List[List[int]] = payload["schema"]
-    students: List[Dict[str, Any]] = payload["students"]  # id, name, first, last, gender
+    students: List[Dict[str, Any]] = payload["students"]
     options_raw: Dict[str, Any] = payload.get("options", {})
     constraints_ui: List[Dict[str, Any]] = payload.get("constraints", [])
     forbidden: List[str] = payload.get("forbidden", [])
     placements: Dict[str, int] = payload.get("placements", {})
     name_view: str = payload.get("name_view", "first")
 
-    # ----------- Normalisation options + modèles métier -----------
+    # ----------- Normalisation options + enrichissement visuel -----------
     options = _parse_options(options_raw)
+
+    # Raccroche la visual_row_map si envoyée à la racine du payload (front)
+    if "visual_row_map" in payload and isinstance(payload["visual_row_map"], dict):
+        options["visual_row_map"] = payload["visual_row_map"]
+
     salle = _build_salle(schema)
     eleves = _eleves_from_payload(students)
     order_ui_ids = _order_ui_ids(students)
 
-    # 1) Construire les contraintes depuis l’UI (inclut exact_seat si présents)
+    # 1) Contraintes depuis l’UI (on laisse placements vides ici)
     contraintes: List[Contrainte] = _build_constraints(
         salle=salle,
         eleves=eleves,
         students_payload=students,
         constraints_ui=constraints_ui,
         forbidden=forbidden,
-        placements={},  # <- on laisse vide ici
-        lock_placements=False,  # <- et False ici
+        placements={},  # pas de lock ici
+        lock_placements=False,  # idem
     )
 
-    # 2) Injection des placements “à verrouiller”, sans doublonner les exacts déjà présents
-    # map id UI -> Eleve
+    # 2) Injection éventuelle des placements “à verrouiller”, sans doublonner les exact déjà présents
     id2eleve = {sid: eleves[i] for i, sid in enumerate(order_ui_ids)}
-
     if options["lock_placements"] and placements:
-        # élève déjà pin par contrainte exact_seat
         pinned_eleves = {c.eleve for c in contraintes if isinstance(c, DoitEtreExactementIci)}
         pinned_ids = {sid for sid, e in id2eleve.items() if e in pinned_eleves}
-        placements_filtrés = {k: v for k, v in placements.items() if int(v) not in pinned_ids}
+        placements_filtres = {k: v for k, v in placements.items() if int(v) not in pinned_ids}
     else:
-        placements_filtrés = {}
+        placements_filtres = {}
 
     inject_locked_placements_as_exact_constraints(
         respect_existing=options["lock_placements"],
-        placements=placements_filtrés,
+        placements=placements_filtres,
         id2eleve=id2eleve,
         contraintes=contraintes,
     )
-    # ----------- Choix du solveur -----------
+
+    # 3) Choix du solveur
     slv, err = _make_solver(options)
     if err:
-        return err
+        return {"status": "FAILURE", "error": err}
 
-    # ----------- Résolution -----------
+    # 4) Résolution
     res, err = _solve(
         slv=slv,
         salle=salle,
@@ -299,10 +401,10 @@ def t_solve_plandeclasse(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         return err
     assert res is not None
 
-    # ----------- Reconstruction assignment (seatKey -> studentId UI) -----------
+    # 5) Reconstruction assignment (seatKey -> studentId UI)
     assignment = _reconstruct_assignment(eleves, order_ui_ids, res.affectation)
 
-    # ----------- Exports (SVG/PNG/PDF/TXT) en cache mémoire -----------
+    # 6) Exports (SVG/PNG/PDF/TXT) en cache mémoire
     downloads = _render_and_cache_exports(
         schema=schema,
         assignment=assignment,
@@ -311,12 +413,12 @@ def t_solve_plandeclasse(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         forbidden=forbidden,
     )
 
-    # ----------- Réponse -----------
+    # 7) Réponse
     return {
         "status": "SUCCESS",
         "assignment": assignment,
         "download": downloads,
-        "solver": "cpsat" if options["solver"] == "cpsat" else "asp",
+        "solver": "cpsat" if isinstance(slv, (SolveurCPSAT,)) else "asp",
         "time_budget_ms": options["time_budget_ms"],
         "random_seed": options["random_seed"],
         "shuffle_students": options["shuffle_students"],

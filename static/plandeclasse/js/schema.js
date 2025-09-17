@@ -22,24 +22,22 @@ import {renderConstraints as rendreContraintes} from "plandeclasse/constraints";
    ========================================================================== */
 
 /**
- * Recalage des placements/interdits/contraintes après un changement de schéma
- * (sans reconstruire etat.schema). Les capacités négatives sont des "trous".
- *
- * Effets :
- * - purge les affectations devenues invalides (hors bornes / sur table-trou / hors capacité),
- * - reconstruit proprement la liste des sièges interdits + contraintes forbid_seat,
- * - rafraîchit l’UI (salle/élèves/contraintes/boutons + mini-éditeur de rangées).
+ * Recalage complet après changement de schéma.
+ * Réécrit pour :
+ *  - purger placements invalides,
+ *  - reconstruire les forbid_seat,
+ *  - **purger les offsets de tables hors bornes**,
+ *  - rafraîchir les vues.
  */
 export function reconcileAfterSchemaChange() {
+    // 1) Placements
     const nouveauxPlacements = new Map();
     const nouvelIndexInverse = new Map();
-
-    // Recalage des affectations existantes
     for (const [cleSiege, sid] of etat.placements.entries()) {
         const [x, y, s] = cleSiege.split(",").map(Number);
         if (y < etat.schema.length && x < etat.schema[y].length) {
-            const capacite = etat.schema[y][x];
-            if (capacite > 0 && s < capacite) {
+            const cap = etat.schema[y][x];
+            if (cap > 0 && s < cap) {
                 nouveauxPlacements.set(cleSiege, sid);
                 nouvelIndexInverse.set(sid, cleSiege);
             }
@@ -48,14 +46,14 @@ export function reconcileAfterSchemaChange() {
     etat.placements = nouveauxPlacements;
     etat.placedByStudent = nouvelIndexInverse;
 
-    // Recalage des sièges interdits (+ contraintes forbid_seat)
+    // 2) Sièges interdits → reconstruit forbid_seat propres
     const nouveauxInterdits = new Set();
     const contraintesInterdits = [];
     for (const cleSiege of etat.forbidden) {
         const [x, y, s] = cleSiege.split(",").map(Number);
         if (y < etat.schema.length && x < etat.schema[y].length) {
-            const capacite = etat.schema[y][x];
-            if (capacite > 0 && s < capacite) {
+            const cap = etat.schema[y][x];
+            if (cap > 0 && s < cap) {
                 nouveauxInterdits.add(cleSiege);
                 contraintesInterdits.push({
                     type: "forbid_seat",
@@ -67,20 +65,29 @@ export function reconcileAfterSchemaChange() {
         }
     }
     etat.forbidden = nouveauxInterdits;
-
-    // Remplace toutes les forbid_seat par la version recalculée
     etat.constraints = etat.constraints
         .filter((c) => c.type !== "forbid_seat")
         .concat(contraintesInterdits);
 
-    // Rafraîchit l’IHM
+    // 3) Purge des offsets de tables hors bornes / trous
+    const nouveauxOffsets = new Map();
+    for (const [tKey, off] of etat.tableOffsets.entries()) {
+        const [x, y] = tKey.split(",").map(Number);
+        if (y < etat.schema.length && x < etat.schema[y].length && etat.schema[y][x] > 0) {
+            const dx = Number.isFinite(off?.dx) ? Number(off.dx) : 0;
+            const dy = Number.isFinite(off?.dy) ? Number(off.dy) : 0;
+            nouveauxOffsets.set(tKey, {dx, dy});
+        }
+    }
+    etat.tableOffsets = nouveauxOffsets;
+
+    // 4) UI
     rendreSalle();
     rendreEleves();
     rendreContraintes();
     majBoutonBan();
     renderRowsEditor();
 }
-
 /* ==========================================================================
    Application d’un schéma "rectangulaire"
    ========================================================================== */
