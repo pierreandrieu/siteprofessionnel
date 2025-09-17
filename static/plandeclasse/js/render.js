@@ -219,21 +219,14 @@ function appendSeatLabelFitted(parent, cx, cy, seatW, seatH, texte, seatKey) {
    ========================================================================== */
 
 /**
- * Rendu du SVG de la salle (tables, sièges, bordures, croisillons, labels).
- * Respecte la CSP (pas d’attribut "style" posé).
- */
-/**
  * Rendu du SVG de la salle (tables, sièges, labels).
  * CSP-friendly : pas de style inline.
- * Gère les offsets persistants + le “draft” (fantôme) d’une table en déplacement clavier.
- * Ajoute data-table="x,y" sur chaque groupe pour la sélection d’une table.
+ *
+ * Amélioration : étend dynamiquement le canvas VERS LE BAS quand des tables
+ * sont déplacées (offset dy > 0) ou quand un ghost (draft) descend plus bas.
+ * -> On recalcule un "contentBottom" (Y maxi contenu) et on ajuste le viewBox/height.
  */
-/**
- * Rendu du SVG de la salle (tables, sièges, labels).
- * CSP-friendly : pas de style inline.
- * Gère les offsets persistants + le “draft” (fantôme) d’une table en déplacement clavier.
- * Ajoute data-table="x,y" sur chaque groupe pour la sélection d’une table.
- */
+
 export function renderRoom() {
     const svg = /** @type {SVGSVGElement|null} */ ($("#roomCanvas"));
     if (!svg) return;
@@ -242,6 +235,7 @@ export function renderRoom() {
     const nbRangees = state.schema.length;
     const {padX, padY, seatW, tableH, seatGap, colGap, rowGap, boardH} = computeDims(state.schema);
 
+    // Salle vide → canevas minimal
     if (nbRangees === 0) {
         svg.setAttribute("viewBox", `0 0 ${Math.round(600 * UI_SCALE)} ${Math.round(200 * UI_SCALE)}`);
         svg.setAttribute("width", String(Math.round(600 * UI_SCALE)));
@@ -249,7 +243,7 @@ export function renderRoom() {
         return;
     }
 
-    // Largeurs de rangée (centrage)
+    // Largeur visuelle de chaque rangée (sans offsets)
     const rowWidths = state.schema.map((caps) => {
         const tablesW = caps.reduce((sum, cap) => {
             const c = Math.abs(cap);
@@ -258,11 +252,13 @@ export function renderRoom() {
         return tablesW + (caps.length - 1) * colGap;
     });
     const maxRowW = Math.max(...rowWidths);
+
+    // Bandeau "TABLEAU"
     const boardW = Math.max(maxRowW, 600 * UI_SCALE);
     const xBoard = padX + (maxRowW - boardW) / 2;
     const yBoard = padY;
 
-    // Origines Y
+    // Origines Y (hors offsets)
     const originsY = [];
     let yCur = yBoard + boardH + Math.round(10 * UI_SCALE);
     for (let y = 0; y < nbRangees; y++) {
@@ -270,16 +266,19 @@ export function renderRoom() {
         yCur += tableH + rowGap;
     }
 
+    // Dimensions "par défaut" (sans offsets)
     const totalW = padX * 2 + maxRowW;
-    const totalH = (originsY.at(-1) || padY + 32) + tableH + padY;
+    const baseBottom = (originsY.at(-1) || padY + 32) + tableH + padY;
+    let totalH = baseBottom;
 
+    // ViewBox initial (sera éventuellement agrandi ensuite)
     svg.setAttribute("viewBox", `0 0 ${totalW} ${totalH}`);
     svg.setAttribute("width", String(totalW));
     svg.setAttribute("height", String(Math.min(800, totalH)));
 
     const ns = "http://www.w3.org/2000/svg";
 
-    // defs pour le pattern “forbid”
+    // defs (pattern sièges interdits)
     const defs = document.createElementNS(ns, "defs");
     const pattern = document.createElementNS(ns, "pattern");
     pattern.setAttribute("id", "forbidPattern");
@@ -301,7 +300,7 @@ export function renderRoom() {
     defs.appendChild(pattern);
     svg.appendChild(defs);
 
-    // Tableau
+    // Bandeau "TABLEAU"
     const rectBoard = document.createElementNS(ns, "rect");
     rectBoard.setAttribute("x", String(xBoard));
     rectBoard.setAttribute("y", String(yBoard));
@@ -322,21 +321,26 @@ export function renderRoom() {
 
     const {firstMap, lastMap, bothMap} = buildDisplayMaps(state.students);
 
-    // Fantôme actif ?
+    // Ghost (nudge) actif ?
     const draft = state.uiDraft.nudge; // {tableKey, dx, dy, invalid} | null
     const draftKey = draft?.tableKey || null;
+
+    // Mesure dynamique du bas ET de la droite du contenu
+    let contentBottom = yBoard + boardH;          // Y max rencontré
+    let contentRight = padX + maxRowW;           // X max rencontré (base : largeur logique)
 
     for (let y = 0; y < nbRangees; y++) {
         const caps = state.schema[y];
 
-        // largeur de la rangée (y)
+        // Largeur logique de la rangée (sans offsets)
         const tablesW = caps.reduce((sum, cap) => {
             const c = Math.abs(cap);
             return sum + c * seatW + (c - 1) * seatGap;
         }, 0);
         const rowW = tablesW + (caps.length - 1) * colGap;
 
-        let ox = padX + (maxRowW - rowW) / 2; // origine X de la rangée centrée
+        // Origine X centrée (sans offsets)
+        let ox = padX + (maxRowW - rowW) / 2;
         const oy = originsY[y];
 
         for (let x = 0; x < caps.length; x++) {
@@ -344,24 +348,26 @@ export function renderRoom() {
             const absCap = Math.abs(cap);
             const tableW = absCap * seatW + (absCap - 1) * seatGap;
 
-            if (cap < 0) {
+            if (cap < 0) { // trou
                 ox += tableW + colGap;
                 continue;
             }
 
-            // Offset persistant éventuellement présent
             const tKey = `${x},${y}`;
             const off = state.tableOffsets.get(tKey) || {dx: 0, dy: 0};
-
             const isDrafted = draftKey === tKey;
 
-            // Groupe table (position persistante)
+            // Groupe table (position "offsettée")
             const g = document.createElementNS(ns, "g");
             g.setAttribute("data-table", tKey);
             g.setAttribute("transform", `translate(${ox + off.dx}, ${oy + off.dy})`);
             svg.appendChild(g);
 
-            // Table (rect principal)
+            // Mets à jour les bornes "réelles"
+            contentBottom = Math.max(contentBottom, oy + off.dy + tableH);
+            contentRight = Math.max(contentRight, ox + off.dx + tableW);
+
+            // Table
             const rectTable = document.createElementNS(ns, "rect");
             rectTable.setAttribute("x", "0");
             rectTable.setAttribute("y", "0");
@@ -374,7 +380,7 @@ export function renderRoom() {
             );
             g.appendChild(rectTable);
 
-            // Si un ghost est actif pour cette table, on le dessine au-dessus
+            // Ghost (si nudge actif) → inclure aussi dans les bornes
             if (isDrafted) {
                 const ghost = document.createElementNS(ns, "rect");
                 ghost.setAttribute("x", String(draft.dx));
@@ -384,9 +390,12 @@ export function renderRoom() {
                 ghost.setAttribute("rx", String(Math.round(10 * UI_SCALE)));
                 ghost.setAttribute("class", "table-ghost" + (draft.invalid ? " table-ghost-invalid" : ""));
                 g.appendChild(ghost);
+
+                contentBottom = Math.max(contentBottom, oy + off.dy + draft.dy + tableH);
+                contentRight = Math.max(contentRight, ox + off.dx + draft.dx + tableW);
             }
 
-            // Sièges de la table
+            // Sièges
             for (let s = 0; s < cap; s++) {
                 const sx = s * (seatW + seatGap);
                 const sy = 0;
@@ -416,7 +425,7 @@ export function renderRoom() {
                 }
                 g.appendChild(rSeat);
 
-                // séparateur entre sièges (ne capte pas les clics)
+                // Séparateur vertical (ne capte pas les clics)
                 if (s < cap - 1) {
                     const divider = document.createElementNS(ns, "rect");
                     const dividerW = Math.max(1, Math.round(1 * UI_SCALE));
@@ -445,24 +454,31 @@ export function renderRoom() {
                 }
             }
 
-            // --- Grab strip (bandeau de sélection table)
-            // Bandeau au-dessus de la table : cliquable, quasi invisible.
+            // Grab strip (bandeau cliquable au-dessus de la table)
             const grabH = Math.max(10, Math.round(8 * UI_SCALE));
             const grab = document.createElementNS(ns, "rect");
             grab.setAttribute("x", "0");
-            grab.setAttribute("y", String(-grabH)); // au-dessus de la table
+            grab.setAttribute("y", String(-grabH));
             grab.setAttribute("width", String(tableW));
             grab.setAttribute("height", String(grabH));
             grab.setAttribute("data-table", tKey);
             grab.setAttribute("class", "table-handle");
-            // invisible mais "peint" pour que les events SVG le prennent comme cible
             grab.setAttribute("fill", "#000");
             grab.setAttribute("fill-opacity", "0.001");
             g.appendChild(grab);
 
-            // Avance le curseur horizontal pour la table suivante
+            // Avance le curseur logique (sans offsets)
             ox += tableW + colGap;
         }
+    }
+
+    // Ajustement final : étendre si nécessaire
+    const newTotalH = Math.max(totalH, Math.ceil(contentBottom + padY));
+    const newTotalW = Math.max(totalW, Math.ceil(contentRight + padX));
+    if (newTotalH !== totalH || newTotalW !== totalW) {
+        svg.setAttribute("viewBox", `0 0 ${newTotalW} ${newTotalH}`);
+        svg.setAttribute("height", String(Math.min(800, newTotalH)));
+        svg.setAttribute("width", String(newTotalW));
     }
 }
 
