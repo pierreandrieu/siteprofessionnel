@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 from typing import Dict, Final, Iterable, List, Tuple, Optional
+import re
 
 from django.conf import settings
 from django.http import Http404, HttpRequest, HttpResponse
@@ -54,6 +55,27 @@ LEVEL_SLUG_TO_DIR: Final[Dict[str, str]] = {
 
 # mapping inverse utile pour fabriquer des liens
 LEVEL_DIR_TO_SLUG: Final[Dict[str, str]] = {v: k for k, v in LEVEL_SLUG_TO_DIR.items()}
+# Préfixes du type "01_", "02-", "10 "… (1 à 3 chiffres + séparateur)
+_INSTITUTION_PREFIX_RE = re.compile(r"^(\d{1,3})[ _-]+")
+
+
+def _cle_tri_institution(nom: str) -> tuple[int, str]:
+    """
+    Clé de tri : (ordre numérique si présent, libellé pour ordre alpha).
+    Les noms SANS préfixe sont envoyés en fin via un grand nombre sentinelle.
+    """
+    m = _INSTITUTION_PREFIX_RE.match(nom)
+    if m:
+        ordre = int(m.group(1))
+        libelle_sans_prefixe = nom[m.end():]
+        return ordre, libelle_sans_prefixe.lower()
+    return 10 ** 6, nom.lower()
+
+
+def _libelle_institution(nom: str) -> str:
+    """Enlève le préfixe numérique pour l’affichage."""
+    m = _INSTITUTION_PREFIX_RE.match(nom)
+    return nom[m.end():] if m else nom
 
 
 def _media_root() -> Path:
@@ -157,13 +179,21 @@ def index(request: HttpRequest) -> HttpResponse:
     for year_dir in (p for p in base.iterdir() if p.is_dir() and not _hidden(p)):
         year = year_dir.name
         inst_to_levels: Dict[str, set] = defaultdict(set)
+
         for institution, level_dir in _iter_level_dirs(year_dir):
             inst_to_levels[institution].add(level_dir.name)
 
         if inst_to_levels:
-            inst_blocks = [(inst, sorted(levels)) for inst, levels in inst_to_levels.items()]
-            # tri alphabétique des établissements pour stabilité
-            inst_blocks.sort(key=lambda t: t[0].lower())
+            # On construit des triples (nom_brut, libellé_affiché, niveaux)
+            triples = [
+                (inst, _libelle_institution(inst), sorted(levels))
+                for inst, levels in inst_to_levels.items()
+            ]
+            # Tri par clé "intuitive" : préfixe numérique si présent, sinon alpha
+            triples.sort(key=lambda t: _cle_tri_institution(t[0]))
+            # On n’expose au template que (libellé_affiché, niveaux)
+            inst_blocks = [(t[1], t[2]) for t in triples]
+
             year_blocks[year] = inst_blocks
 
     if not year_blocks:
