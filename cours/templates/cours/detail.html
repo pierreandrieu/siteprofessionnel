@@ -27,5 +27,18 @@
             <dt class="col-sm-3">fichier</dt>
             <dd class="col-sm-9">{{ doc.slug }}.pdf</dd>
         </dl>
+
+        {% if attachments %}
+            <hr class="my-4">
+            <h2 class="h5 mb-3">fichiers à télécharger</h2>
+            <ul class="list-unstyled">
+                {% for f in attachments %}
+                    <li class="mb-1">
+                        <a href="{{ f.url }}" download>{{ f.name }}</a>
+                        <small class="text-muted">({{ f.size|filesizeformat }})</small>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endif %}
     </div>
 {% endblock %}
