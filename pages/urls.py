@@ -11,4 +11,5 @@ urlpatterns = [
     path("about/", views.about, name="about"),
     path("vie-privee-hebergement/", views.privacy, name="privacy"),
     path("initiatives/", views.initiatives, name="initiatives"),
+    path("contact/", views.contact, name="contact"),
 ]

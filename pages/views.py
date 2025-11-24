@@ -26,3 +26,8 @@ def privacy(request) -> HttpResponse:
 def initiatives(request) -> HttpResponse:
     """Page Initiatives européennes & open-source."""
     return render(request, "pages/initiatives.html")
+
+
+def contact(request: HttpRequest) -> HttpResponse:
+    """Page de contact (adresse e-mail)."""
+    return render(request, "pages/contact.html")
