@@ -21,6 +21,7 @@
 import {clearSelection, clearTableNudgeDraft, state} from "plandeclasse/state";
 import {renderRoom, renderStudents, updateBanButtonLabel} from "plandeclasse/render";
 import {renderConstraints} from "plandeclasse/constraints";
+import {compareByLastThenFirst} from "plandeclasse/utils";
 
 /** Déplacement unitaire du ghost (en unités SVG). */
 const NUDGE_STEP = 12;
@@ -540,4 +541,75 @@ export function unassignSelected() {
     // Re-rendu + synchro des boutons
     refreshPlanUI();
     renderConstraints();
+}
+
+/* ==========================================================================
+   Remplissage automatique par ordre alphabétique
+   ========================================================================== */
+
+/**
+ * Remplit les sièges disponibles avec les élèves non encore placés,
+ * par ordre alphabétique (nom puis prénom).
+ *
+ * Règles :
+ *  - On ne déplace PAS les élèves déjà placés.
+ *  - On ignore les sièges interdits (state.forbidden).
+ *  - On parcourt les sièges dans l'ordre (y, x, s) du schéma.
+ *  - Aucune contrainte exact_seat n'est ajoutée : le plan reste "souple".
+ */
+export function fillStudentsAlphabetically() {
+    // 1) Construire la liste des sièges libres et autorisés
+    /** @type {string[]} */
+    const clesSiegesLibres = [];
+
+    for (let y = 0; y < state.schema.length; y++) {
+        const rangee = state.schema[y];
+        for (let x = 0; x < rangee.length; x++) {
+            const capacite = rangee[x];
+            if (!Number.isFinite(capacite) || capacite <= 0) continue;
+
+            for (let s = 0; s < capacite; s++) {
+                const cle = `${x},${y},${s}`;
+                if (state.forbidden.has(cle)) continue;  // siège interdit
+                if (state.placements.has(cle)) continue; // déjà occupé
+                clesSiegesLibres.push(cle);
+            }
+        }
+    }
+
+    if (clesSiegesLibres.length === 0) {
+        alert("Aucun siège libre disponible pour le remplissage automatique.");
+        return;
+    }
+
+    // 2) Récupérer les élèves non encore placés, triés par nom puis prénom
+    const idsDejaPlaces = new Set(state.placedByStudent.keys());
+    const elevesNonPlaces = state.students
+        .filter((e) => !idsDejaPlaces.has(e.id))
+        .slice()
+        .sort(compareByLastThenFirst);
+
+    if (elevesNonPlaces.length === 0) {
+        alert("Tous les élèves sont déjà placés.");
+        return;
+    }
+
+    // 3) Associer les élèves aux sièges libres dans l'ordre
+    const nbAPlacer = Math.min(clesSiegesLibres.length, elevesNonPlaces.length);
+
+    for (let i = 0; i < nbAPlacer; i++) {
+        const cleSiege = clesSiegesLibres[i];
+        const eleve = elevesNonPlaces[i];
+        state.placements.set(cleSiege, eleve.id);
+        state.placedByStudent.set(eleve.id, cleSiege);
+    }
+
+    // 4) Nettoyer la sélection et rafraîchir l'UI
+    state.selection.studentId = null;
+    state.selection.seatKey = null;
+
+    renderRoom();
+    renderStudents();
+    updateBanButtonLabel();
+    // Les contraintes ne changent pas, mais on les laisse telles quelles.
 }

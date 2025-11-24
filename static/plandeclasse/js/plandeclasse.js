@@ -33,6 +33,7 @@ import {
     resetPlanKeepRoom as reinitialiserPlanSeulement,
     toggleSelectedSeatBan as basculerSiegeInterdit,
     unassignSelected as desaffecterSelection,
+    fillStudentsAlphabetically as remplirPlanAlpha,
 } from "plandeclasse/interactions";
 
 // Schéma de salle
@@ -264,6 +265,16 @@ function initialiser() {
     const optSolo = /** @type {HTMLInputElement|null} */ (document.getElementById("optSolo"));
     if (optMix) etat.options.prefer_mixage = !!optMix.checked;
     if (optSolo) etat.options.prefer_alone = !!optSolo.checked;
+
+    // --- Bouton : remplir les sièges libres par ordre alphabétique
+    const boutonPlanAlpha = document.getElementById("btnAlphaPlan");
+    if (boutonPlanAlpha && !boutonPlanAlpha.dataset.wired) {
+        boutonPlanAlpha.dataset.wired = "1";
+        boutonPlanAlpha.addEventListener("click", (ev) => {
+            ev.preventDefault();
+            remplirPlanAlpha();
+        });
+    }
 }
 
 // Démarrage une fois le DOM prêt
